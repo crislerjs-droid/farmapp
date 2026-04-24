@@ -183,6 +183,9 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="saveFile();hideMenu();">💾 Save Data</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="loadFile();hideMenu();">📥 Load Data</div>
   <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudSave();hideMenu();">☁️ Cloud Save</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudLoad();hideMenu();">☁️ Cloud Load</div>
+  <div style="height:1px;background:#333;margin:4px 0;"></div>
   <div style="padding:6px 14px;font-size:11px;color:#ef4444;cursor:pointer;" onclick="resetData();hideMenu();">🗑️ Reset All</div>
 </div>
 
@@ -3745,6 +3748,60 @@ window.addEventListener('DOMContentLoaded',()=>{
   else if(EMB&&EMB.features&&EMB.features.length>0){F=[];nid=1;impGJ(EMB);boot();}
   else renderUI();
 });
+
+// === FIREBASE CLOUD SAVE/LOAD ===
+// Stores the same blob that save() writes to localStorage, serialized as a
+// JSON string in a single Firestore doc. Stringifying sidesteps Firestore's
+// "no nested arrays" rule (field.points = [[lat,lon],...] would be rejected
+// as structured data).
+const FB_CONFIG = {
+  apiKey: "AIzaSyBjO2EHtOlg-G2_fqFmO0awq-pMq2_fBko",
+  authDomain: "farm-app-6e176.firebaseapp.com",
+  projectId: "farm-app-6e176",
+  storageBucket: "farm-app-6e176.firebasestorage.app",
+  messagingSenderId: "1074472882994",
+  appId: "1:1074472882994:web:0f62ddf8764046e023fd2b",
+  measurementId: "G-YC7R345Q6R"
+};
+const FB_VER = '12.12.1';
+const FB_COLL = 'saves';
+const FB_DOC = 'default'; // single-user slot; becomes per-user when auth lands
+let __fb = null;
+async function __fbInit(){
+  if(__fb) return __fb;
+  const appMod = await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`);
+  const fsMod  = await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`);
+  const app = appMod.initializeApp(FB_CONFIG);
+  const db = fsMod.getFirestore(app);
+  __fb = { db, doc: fsMod.doc, setDoc: fsMod.setDoc, getDoc: fsMod.getDoc };
+  return __fb;
+}
+async function cloudSave(){
+  try {
+    save(); // flush current state to localStorage first
+    const raw = localStorage.getItem(SK);
+    if(!raw){ alert('Nothing to save yet.'); return; }
+    const { db, doc, setDoc } = await __fbInit();
+    await setDoc(doc(db, FB_COLL, FB_DOC), { v:7, json: raw, ts: Date.now() });
+    alert('Cloud save complete ('+(raw.length/1024|0)+' KB).');
+  } catch(e){ alert('Cloud save failed: '+e.message); }
+}
+async function cloudLoad(){
+  if(!confirm('Replace current data with the cloud save?')) return;
+  try {
+    const { db, doc, getDoc } = await __fbInit();
+    const snap = await getDoc(doc(db, FB_COLL, FB_DOC));
+    if(!snap.exists()){ alert('No cloud save found yet.'); return; }
+    const p = snap.data();
+    const raw = p.json || (p.data ? JSON.stringify(p.data) : null);
+    if(!raw){ alert('Cloud save looks empty.'); return; }
+    const d = JSON.parse(raw);
+    if(!d.F || !d.F.length){ alert('Cloud save has no fields.'); return; }
+    d.v = 7;
+    localStorage.setItem(SK, JSON.stringify(d));
+    location.reload();
+  } catch(e){ alert('Cloud load failed: '+e.message); }
+}
 </script>
 </body>
 </html>

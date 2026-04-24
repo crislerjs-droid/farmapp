@@ -7,7 +7,7 @@
 #>
 param(
   [int]$Port = 8000,
-  [string]$Entry = 'field-commander-v4 (12).html'
+  [string]$Entry = 'index.html'
 )
 
 $ErrorActionPreference = 'Stop'

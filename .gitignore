@@ -21,6 +21,9 @@ desktop.ini
 firebase-config.local.js
 serviceAccountKey*.json
 
+# Firebase CLI local cache
+.firebase/
+
 # Local save exports (your farm data — keep out of source control)
 fc-save*.json
 
