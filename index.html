@@ -138,15 +138,23 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 
 <!-- Sign-in gate (covers app until authenticated) -->
 <div id="signin-overlay" style="display:flex;position:fixed;inset:0;background:rgba(15,23,42,0.96);z-index:9999;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;">
-  <div style="background:#1e293b;color:#e2e8f0;padding:32px 40px;border-radius:8px;text-align:center;max-width:380px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
-    <div style="font-size:22px;margin-bottom:6px;">🌾 Field Commander</div>
-    <div id="signin-msg" style="font-size:13px;color:#94a3b8;margin:14px 0 22px;">Connecting…</div>
-    <button id="signin-btn" onclick="fbSignIn()" style="display:none;background:#3b82f6;color:#fff;border:0;padding:10px 24px;border-radius:6px;font-size:14px;cursor:pointer;font-weight:500;">Sign in with Google</button>
+  <div style="background:#1e293b;color:#e2e8f0;padding:30px 36px;border-radius:8px;width:340px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+    <div style="font-size:22px;margin-bottom:4px;text-align:center;">🌾 Field Commander</div>
+    <div id="signin-msg" style="font-size:13px;color:#94a3b8;margin:10px 0 18px;text-align:center;">Sign in or create your account.</div>
+    <input id="auth-email" type="email" autocomplete="username" placeholder="Email" style="display:block;width:100%;box-sizing:border-box;background:#0f172a;color:#e2e8f0;border:1px solid #334155;padding:9px 12px;border-radius:5px;font-size:14px;margin-bottom:8px;outline:none;">
+    <input id="auth-password" type="password" autocomplete="current-password" placeholder="Password (min 6 chars)" style="display:block;width:100%;box-sizing:border-box;background:#0f172a;color:#e2e8f0;border:1px solid #334155;padding:9px 12px;border-radius:5px;font-size:14px;margin-bottom:14px;outline:none;" onkeydown="if(event.key==='Enter')fbSignIn()">
+    <div style="display:flex;gap:8px;">
+      <button id="signin-btn" onclick="fbSignIn()" style="background:#3b82f6;color:#fff;border:0;padding:9px 14px;border-radius:5px;font-size:13px;cursor:pointer;font-weight:500;flex:1;">Sign In</button>
+      <button id="signup-btn" onclick="fbSignUp()" style="background:#475569;color:#fff;border:0;padding:9px 14px;border-radius:5px;font-size:13px;cursor:pointer;font-weight:500;flex:1;">Create Account</button>
+    </div>
   </div>
 </div>
 
 <!-- Sync status pill -->
 <div id="sync-pill" style="position:fixed;bottom:10px;right:12px;z-index:9998;background:#6b7280;color:#fff;padding:4px 11px;border-radius:99px;font-size:11px;font-family:system-ui,-apple-system,sans-serif;letter-spacing:0.2px;box-shadow:0 1px 4px rgba(0,0,0,0.2);">Connecting…</div>
+
+<!-- Teammate-update banner (shown when remote changes arrive) -->
+<div id="update-banner" style="display:none;position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:9997;background:#2563eb;color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);" onclick="location.reload();" title="Click to refresh and load the latest changes">🔄 Updates from a teammate — click to refresh</div>
 
 <!-- Toolbar -->
 <div class="tb">
@@ -3760,15 +3768,18 @@ window.addEventListener('DOMContentLoaded',()=>{
   fbBoot(); // gates app behind auth, hydrates from cloud, then runs the local boot path
 });
 
-// === FIREBASE: AUTH + CLOUD-FIRST SYNC ===
+// === FIREBASE: SHARED TEAM WORKSPACE ===
 // Architecture:
-// - Auth gates the app (Google sign-in, one user per account).
-// - Per-user state at users/{uid}/state/main as a single JSON-string blob.
-// - On boot: pull cloud → write to localStorage → run existing loadSaved/boot path.
-// - On every save(): debounced cloud write (1.5s) so changes flow up without UI.
-// - Cloud is source of truth; localStorage is an offline cache.
-// One-time legacy migration: if a new user has no doc but saves/default exists,
-// copy that legacy blob into their per-user doc on first sign-in.
+// - Google sign-in gates the app; only allowlisted emails (in firestore.rules)
+//   can read/write. Unauthorized accounts are signed out with a clear message.
+// - Single shared doc at state/main holds the team's data as a JSON string.
+//   Last-write-wins on conflicts (acceptable for ~3 users not editing the
+//   same field at the same second; per-entity locking is a later port).
+// - Auto-sync: every save() schedules a debounced cloud write (1.5s).
+// - Real-time: onSnapshot listens for teammate writes; on remote change a
+//   refresh banner is shown so the user controls when state is replaced
+//   (avoids stomping on whatever they're typing).
+// - clientId tag distinguishes our own writes from teammates'.
 const FB_CONFIG = {
   apiKey: "AIzaSyBjO2EHtOlg-G2_fqFmO0awq-pMq2_fBko",
   authDomain: "farm-app-6e176.firebaseapp.com",
@@ -3780,10 +3791,12 @@ const FB_CONFIG = {
 };
 const FB_VER = '12.12.1';
 const SYNC_DEBOUNCE_MS = 1500;
+const __clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
 let __fb = null;
 let __fbUser = null;
 let __syncTimer = null;
-let __bootDone = false; // suppress cloud writes during initial hydration
+let __bootDone = false;
+let __snapshotUnsub = null;
 
 async function __fbInit(){
   if(__fb) return __fb;
@@ -3794,9 +3807,9 @@ async function __fbInit(){
   __fb = {
     db: f.getFirestore(app),
     auth: u.getAuth(app),
-    doc: f.doc, setDoc: f.setDoc, getDoc: f.getDoc,
-    GoogleAuthProvider: u.GoogleAuthProvider,
-    signInWithPopup: u.signInWithPopup,
+    doc: f.doc, setDoc: f.setDoc, getDoc: f.getDoc, onSnapshot: f.onSnapshot,
+    signInWithEmailAndPassword: u.signInWithEmailAndPassword,
+    createUserWithEmailAndPassword: u.createUserWithEmailAndPassword,
     fbSignOut: u.signOut,
     onAuthStateChanged: u.onAuthStateChanged
   };
@@ -3816,51 +3829,93 @@ function setSync(status, msg){
 function showSignInUI(visible, msg){
   const o = document.getElementById('signin-overlay');
   const m = document.getElementById('signin-msg');
-  const b = document.getElementById('signin-btn');
   if(o) o.style.display = visible ? 'flex' : 'none';
   if(m) m.textContent = msg || '';
-  if(b){
-    const showBtn = visible && !!msg && !msg.toLowerCase().includes('connecting') && !msg.toLowerCase().includes('signing in') && !msg.toLowerCase().includes('loading');
-    b.style.display = showBtn ? 'inline-block' : 'none';
-  }
+}
+
+function showAuthError(e){
+  const map = {
+    'auth/invalid-credential': 'Wrong email or password.',
+    'auth/user-not-found': 'No account with that email. Use Create Account instead.',
+    'auth/wrong-password': 'Wrong password.',
+    'auth/email-already-in-use': 'Account already exists. Use Sign In instead.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/invalid-email': 'That email is not valid.',
+    'auth/missing-password': 'Enter a password.',
+    'auth/too-many-requests': 'Too many attempts. Wait a minute and try again.',
+    'auth/network-request-failed': 'Network error. Check your connection.'
+  };
+  const msg = map[e && e.code] || (e && e.message) || 'Auth error.';
+  setSync('error', 'Auth error');
+  showSignInUI(true, msg);
+  console.error(e);
+}
+
+function showUpdateBanner(byWhom){
+  const b = document.getElementById('update-banner');
+  if(!b) return;
+  b.textContent = `🔄 ${byWhom ? byWhom + ' just' : 'A teammate'} made changes — click to refresh`;
+  b.style.display = 'block';
+}
+
+function __getAuthFormCreds(){
+  const email = (document.getElementById('auth-email').value || '').trim();
+  const password = document.getElementById('auth-password').value || '';
+  return { email, password };
 }
 
 async function fbSignIn(){
+  const { email, password } = __getAuthFormCreds();
+  if(!email || !password){ showSignInUI(true, 'Enter email and password.'); return; }
   try {
-    const { auth, GoogleAuthProvider, signInWithPopup } = await __fbInit();
+    const { auth, signInWithEmailAndPassword } = await __fbInit();
     showSignInUI(true, 'Signing in…');
     setSync('syncing', 'Signing in…');
-    await signInWithPopup(auth, new GoogleAuthProvider());
-    // onAuthStateChanged in fbBoot handles the rest
-  } catch(e){
-    showSignInUI(true, 'Sign-in failed. Try again.');
-    setSync('error', 'Sign-in failed');
-    console.error(e);
-  }
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch(e){ showAuthError(e); }
+}
+
+async function fbSignUp(){
+  const { email, password } = __getAuthFormCreds();
+  if(!email || !password){ showSignInUI(true, 'Enter email and password.'); return; }
+  if(password.length < 6){ showSignInUI(true, 'Password must be at least 6 characters.'); return; }
+  try {
+    const { auth, createUserWithEmailAndPassword } = await __fbInit();
+    showSignInUI(true, 'Creating account…');
+    setSync('syncing', 'Creating account…');
+    await createUserWithEmailAndPassword(auth, email, password);
+  } catch(e){ showAuthError(e); }
 }
 
 async function fbSignOut(){
   if(!confirm('Sign out? Local data stays on this device.')) return;
   try {
     const { auth, fbSignOut: signOutFn } = await __fbInit();
+    if(__snapshotUnsub){ try { __snapshotUnsub(); } catch(_){} __snapshotUnsub = null; }
     await signOutFn(auth);
   } catch(e){ console.error(e); }
   location.reload();
 }
 
-function userDocRef(){
-  if(!__fb || !__fbUser) return null;
-  return __fb.doc(__fb.db, 'users', __fbUser.uid, 'state', 'main');
+function teamDocRef(){
+  if(!__fb) return null;
+  return __fb.doc(__fb.db, 'state', 'main');
 }
 
 async function cloudSyncNow(){
   if(!__fbUser || !__bootDone) return;
   try {
     setSync('syncing');
-    save(); // flush in-memory state to localStorage first
+    save();
     const raw = localStorage.getItem(SK);
     if(!raw){ setSync('synced'); return; }
-    await __fb.setDoc(userDocRef(), { v:7, json: raw, ts: Date.now() });
+    await __fb.setDoc(teamDocRef(), {
+      v: 7,
+      json: raw,
+      ts: Date.now(),
+      editedBy: __fbUser.email || __fbUser.uid,
+      clientId: __clientId
+    });
     setSync('synced');
   } catch(e){
     setSync('error');
@@ -3893,37 +3948,40 @@ async function fbBoot(){
     console.error(e);
     return;
   }
-  const { auth, db, doc, getDoc, setDoc, onAuthStateChanged } = initialized;
+  const { auth, getDoc, setDoc, onSnapshot, onAuthStateChanged, fbSignOut: signOutFn } = initialized;
 
   onAuthStateChanged(auth, async (user) => {
     __fbUser = user;
+    if(__snapshotUnsub){ try { __snapshotUnsub(); } catch(_){} __snapshotUnsub = null; }
     if(!user){
       __bootDone = false;
-      showSignInUI(true, 'Sign in to access your farm data.');
+      showSignInUI(true, 'Sign in to access the team workspace.');
       setSync('signedout');
       return;
     }
-    showSignInUI(true, 'Loading your data…');
+    showSignInUI(true, 'Loading…');
     setSync('syncing', 'Loading…');
+    const ref = teamDocRef();
     try {
-      const userRef = doc(db, 'users', user.uid, 'state', 'main');
-      const snap = await getDoc(userRef);
+      const snap = await getDoc(ref);
       if(snap.exists() && snap.data().json){
         localStorage.setItem(SK, snap.data().json);
-      } else {
-        // First sign-in: try one-time migration from legacy single-doc.
-        try {
-          const legSnap = await getDoc(doc(db, 'saves', 'default'));
-          if(legSnap.exists() && legSnap.data().json){
-            localStorage.setItem(SK, legSnap.data().json);
-            await setDoc(userRef, { v:7, json: legSnap.data().json, ts: Date.now() });
-          } else if(localStorage.getItem(SK)){
-            // Existing local data, no cloud yet: push it up.
-            await setDoc(userRef, { v:7, json: localStorage.getItem(SK), ts: Date.now() });
-          }
-        } catch(_){ /* legacy read may be locked down later; ignore */ }
+      } else if(localStorage.getItem(SK)){
+        // No shared doc yet but we have local data — seed the team workspace.
+        await setDoc(ref, {
+          v: 7,
+          json: localStorage.getItem(SK),
+          ts: Date.now(),
+          editedBy: user.email || user.uid,
+          clientId: __clientId
+        });
       }
     } catch(e){
+      if(e && (e.code === 'permission-denied' || /permission/i.test(e.message || ''))){
+        alert(`${user.email || 'This account'} isn\'t on the access list for this app.\n\nAsk the admin to add you, or sign in with an authorized account.`);
+        try { await signOutFn(auth); } catch(_){}
+        return;
+      }
       console.error('Cloud load failed, falling back to localStorage:', e);
       setSync('error', 'Cloud load failed');
     }
@@ -3938,6 +3996,18 @@ async function fbBoot(){
     __bootDone = true;
     showSignInUI(false);
     setSync(navigator.onLine ? 'synced' : 'offline');
+
+    // Real-time: alert when a teammate updates the shared doc.
+    __snapshotUnsub = onSnapshot(ref, (snap) => {
+      if(!__bootDone) return;
+      if(!snap.exists()) return;
+      if(snap.metadata.hasPendingWrites) return; // own optimistic write
+      const data = snap.data();
+      if(data.clientId === __clientId) return;    // server confirmation of our own write
+      showUpdateBanner(data.editedBy);
+    }, (err) => {
+      console.error('Snapshot error:', err);
+    });
   });
 
   window.addEventListener('online',  () => { if(__fbUser){ setSync('syncing'); cloudSyncNow(); } });
@@ -3954,8 +4024,8 @@ async function cloudLoad(){
   if(!__fbUser){ alert('Sign in first.'); return; }
   if(!confirm('Discard local changes and pull the latest cloud version?')) return;
   try {
-    const snap = await __fb.getDoc(userDocRef());
-    if(!snap.exists()){ alert('No cloud data found yet.'); return; }
+    const snap = await __fb.getDoc(teamDocRef());
+    if(!snap.exists()){ alert('No team data in the cloud yet.'); return; }
     const p = snap.data();
     if(!p.json){ alert('Cloud doc is empty.'); return; }
     localStorage.setItem(SK, p.json);
