@@ -136,6 +136,18 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 </head>
 <body>
 
+<!-- Sign-in gate (covers app until authenticated) -->
+<div id="signin-overlay" style="display:flex;position:fixed;inset:0;background:rgba(15,23,42,0.96);z-index:9999;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background:#1e293b;color:#e2e8f0;padding:32px 40px;border-radius:8px;text-align:center;max-width:380px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+    <div style="font-size:22px;margin-bottom:6px;">🌾 Field Commander</div>
+    <div id="signin-msg" style="font-size:13px;color:#94a3b8;margin:14px 0 22px;">Connecting…</div>
+    <button id="signin-btn" onclick="fbSignIn()" style="display:none;background:#3b82f6;color:#fff;border:0;padding:10px 24px;border-radius:6px;font-size:14px;cursor:pointer;font-weight:500;">Sign in with Google</button>
+  </div>
+</div>
+
+<!-- Sync status pill -->
+<div id="sync-pill" style="position:fixed;bottom:10px;right:12px;z-index:9998;background:#6b7280;color:#fff;padding:4px 11px;border-radius:99px;font-size:11px;font-family:system-ui,-apple-system,sans-serif;letter-spacing:0.2px;box-shadow:0 1px 4px rgba(0,0,0,0.2);">Connecting…</div>
+
 <!-- Toolbar -->
 <div class="tb">
   <span class="tb-title" onclick="goHome()">🌾 FIELD COMMANDER</span>
@@ -183,9 +195,10 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="saveFile();hideMenu();">💾 Save Data</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="loadFile();hideMenu();">📥 Load Data</div>
   <div style="height:1px;background:#333;margin:4px 0;"></div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudSave();hideMenu();">☁️ Cloud Save</div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudLoad();hideMenu();">☁️ Cloud Load</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudSave();hideMenu();" title="Force an immediate cloud sync (auto-sync also runs after each change)">☁️ Force Sync Now</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudLoad();hideMenu();" title="Discard local changes and pull the latest from cloud">⬇️ Pull from Cloud</div>
   <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="fbSignOut();hideMenu();">🚪 Sign Out</div>
   <div style="padding:6px 14px;font-size:11px;color:#ef4444;cursor:pointer;" onclick="resetData();hideMenu();">🗑️ Reset All</div>
 </div>
 
@@ -3743,17 +3756,19 @@ function closePrintOverlay(){
 // === INIT ===
 function boot(){F.forEach(f=>ensureColors(f));seedTraitGuesses();popFilters();popVar();draw();fitAll();renderUI();renderPills();save();}
 window.addEventListener('DOMContentLoaded',()=>{
-  initMap();let ok=false;try{ok=loadSaved();}catch(e){}
-  if(ok&&F.length>0){boot();}
-  else if(EMB&&EMB.features&&EMB.features.length>0){F=[];nid=1;impGJ(EMB);boot();}
-  else renderUI();
+  initMap();
+  fbBoot(); // gates app behind auth, hydrates from cloud, then runs the local boot path
 });
 
-// === FIREBASE CLOUD SAVE/LOAD ===
-// Stores the same blob that save() writes to localStorage, serialized as a
-// JSON string in a single Firestore doc. Stringifying sidesteps Firestore's
-// "no nested arrays" rule (field.points = [[lat,lon],...] would be rejected
-// as structured data).
+// === FIREBASE: AUTH + CLOUD-FIRST SYNC ===
+// Architecture:
+// - Auth gates the app (Google sign-in, one user per account).
+// - Per-user state at users/{uid}/state/main as a single JSON-string blob.
+// - On boot: pull cloud → write to localStorage → run existing loadSaved/boot path.
+// - On every save(): debounced cloud write (1.5s) so changes flow up without UI.
+// - Cloud is source of truth; localStorage is an offline cache.
+// One-time legacy migration: if a new user has no doc but saves/default exists,
+// copy that legacy blob into their per-user doc on first sign-in.
 const FB_CONFIG = {
   apiKey: "AIzaSyBjO2EHtOlg-G2_fqFmO0awq-pMq2_fBko",
   authDomain: "farm-app-6e176.firebaseapp.com",
@@ -3764,43 +3779,188 @@ const FB_CONFIG = {
   measurementId: "G-YC7R345Q6R"
 };
 const FB_VER = '12.12.1';
-const FB_COLL = 'saves';
-const FB_DOC = 'default'; // single-user slot; becomes per-user when auth lands
+const SYNC_DEBOUNCE_MS = 1500;
 let __fb = null;
+let __fbUser = null;
+let __syncTimer = null;
+let __bootDone = false; // suppress cloud writes during initial hydration
+
 async function __fbInit(){
   if(__fb) return __fb;
-  const appMod = await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`);
-  const fsMod  = await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`);
-  const app = appMod.initializeApp(FB_CONFIG);
-  const db = fsMod.getFirestore(app);
-  __fb = { db, doc: fsMod.doc, setDoc: fsMod.setDoc, getDoc: fsMod.getDoc };
+  const a = await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`);
+  const f = await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`);
+  const u = await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-auth.js`);
+  const app = a.initializeApp(FB_CONFIG);
+  __fb = {
+    db: f.getFirestore(app),
+    auth: u.getAuth(app),
+    doc: f.doc, setDoc: f.setDoc, getDoc: f.getDoc,
+    GoogleAuthProvider: u.GoogleAuthProvider,
+    signInWithPopup: u.signInWithPopup,
+    fbSignOut: u.signOut,
+    onAuthStateChanged: u.onAuthStateChanged
+  };
   return __fb;
 }
-async function cloudSave(){
+
+function setSync(status, msg){
+  const el = document.getElementById('sync-pill');
+  if(!el) return;
+  const colors = {synced:'#16a34a', syncing:'#2563eb', offline:'#6b7280', error:'#dc2626', signedout:'#475569'};
+  const labels = {synced:'Synced ✓', syncing:'Syncing…', offline:'Offline', error:'Sync error', signedout:'Signed out'};
+  el.style.background = colors[status] || '#6b7280';
+  el.textContent = msg || labels[status] || status;
+  el.dataset.status = status;
+}
+
+function showSignInUI(visible, msg){
+  const o = document.getElementById('signin-overlay');
+  const m = document.getElementById('signin-msg');
+  const b = document.getElementById('signin-btn');
+  if(o) o.style.display = visible ? 'flex' : 'none';
+  if(m) m.textContent = msg || '';
+  if(b){
+    const showBtn = visible && !!msg && !msg.toLowerCase().includes('connecting') && !msg.toLowerCase().includes('signing in') && !msg.toLowerCase().includes('loading');
+    b.style.display = showBtn ? 'inline-block' : 'none';
+  }
+}
+
+async function fbSignIn(){
   try {
-    save(); // flush current state to localStorage first
+    const { auth, GoogleAuthProvider, signInWithPopup } = await __fbInit();
+    showSignInUI(true, 'Signing in…');
+    setSync('syncing', 'Signing in…');
+    await signInWithPopup(auth, new GoogleAuthProvider());
+    // onAuthStateChanged in fbBoot handles the rest
+  } catch(e){
+    showSignInUI(true, 'Sign-in failed. Try again.');
+    setSync('error', 'Sign-in failed');
+    console.error(e);
+  }
+}
+
+async function fbSignOut(){
+  if(!confirm('Sign out? Local data stays on this device.')) return;
+  try {
+    const { auth, fbSignOut: signOutFn } = await __fbInit();
+    await signOutFn(auth);
+  } catch(e){ console.error(e); }
+  location.reload();
+}
+
+function userDocRef(){
+  if(!__fb || !__fbUser) return null;
+  return __fb.doc(__fb.db, 'users', __fbUser.uid, 'state', 'main');
+}
+
+async function cloudSyncNow(){
+  if(!__fbUser || !__bootDone) return;
+  try {
+    setSync('syncing');
+    save(); // flush in-memory state to localStorage first
     const raw = localStorage.getItem(SK);
-    if(!raw){ alert('Nothing to save yet.'); return; }
-    const { db, doc, setDoc } = await __fbInit();
-    await setDoc(doc(db, FB_COLL, FB_DOC), { v:7, json: raw, ts: Date.now() });
-    alert('Cloud save complete ('+(raw.length/1024|0)+' KB).');
-  } catch(e){ alert('Cloud save failed: '+e.message); }
+    if(!raw){ setSync('synced'); return; }
+    await __fb.setDoc(userDocRef(), { v:7, json: raw, ts: Date.now() });
+    setSync('synced');
+  } catch(e){
+    setSync('error');
+    console.error('Cloud sync failed:', e);
+  }
+}
+
+function scheduleCloudSync(){
+  if(!__fbUser || !__bootDone) return;
+  setSync('syncing');
+  if(__syncTimer) clearTimeout(__syncTimer);
+  __syncTimer = setTimeout(cloudSyncNow, SYNC_DEBOUNCE_MS);
+}
+
+// Wrap save() so every mutation auto-syncs to the cloud.
+const __save_orig = save;
+save = function(){
+  __save_orig.apply(this, arguments);
+  scheduleCloudSync();
+};
+
+async function fbBoot(){
+  showSignInUI(true, 'Connecting…');
+  setSync('syncing', 'Connecting…');
+  let initialized;
+  try { initialized = await __fbInit(); }
+  catch(e){
+    setSync('error', 'Firebase failed to load');
+    showSignInUI(true, 'Could not load Firebase. Check your connection.');
+    console.error(e);
+    return;
+  }
+  const { auth, db, doc, getDoc, setDoc, onAuthStateChanged } = initialized;
+
+  onAuthStateChanged(auth, async (user) => {
+    __fbUser = user;
+    if(!user){
+      __bootDone = false;
+      showSignInUI(true, 'Sign in to access your farm data.');
+      setSync('signedout');
+      return;
+    }
+    showSignInUI(true, 'Loading your data…');
+    setSync('syncing', 'Loading…');
+    try {
+      const userRef = doc(db, 'users', user.uid, 'state', 'main');
+      const snap = await getDoc(userRef);
+      if(snap.exists() && snap.data().json){
+        localStorage.setItem(SK, snap.data().json);
+      } else {
+        // First sign-in: try one-time migration from legacy single-doc.
+        try {
+          const legSnap = await getDoc(doc(db, 'saves', 'default'));
+          if(legSnap.exists() && legSnap.data().json){
+            localStorage.setItem(SK, legSnap.data().json);
+            await setDoc(userRef, { v:7, json: legSnap.data().json, ts: Date.now() });
+          } else if(localStorage.getItem(SK)){
+            // Existing local data, no cloud yet: push it up.
+            await setDoc(userRef, { v:7, json: localStorage.getItem(SK), ts: Date.now() });
+          }
+        } catch(_){ /* legacy read may be locked down later; ignore */ }
+      }
+    } catch(e){
+      console.error('Cloud load failed, falling back to localStorage:', e);
+      setSync('error', 'Cloud load failed');
+    }
+
+    // Hand off to the original boot path against the (possibly cloud-hydrated) localStorage.
+    let ok = false;
+    try { ok = loadSaved(); } catch(e){ console.error(e); }
+    if(ok && F.length > 0){ boot(); }
+    else if(EMB && EMB.features && EMB.features.length > 0){ F=[]; nid=1; impGJ(EMB); boot(); }
+    else { renderUI(); }
+
+    __bootDone = true;
+    showSignInUI(false);
+    setSync(navigator.onLine ? 'synced' : 'offline');
+  });
+
+  window.addEventListener('online',  () => { if(__fbUser){ setSync('syncing'); cloudSyncNow(); } });
+  window.addEventListener('offline', () => setSync('offline'));
+}
+
+// Manual triggers (kept in the menu as "Force Sync Now" / "Pull from Cloud").
+async function cloudSave(){
+  if(!__fbUser){ alert('Sign in first.'); return; }
+  await cloudSyncNow();
+  alert('Synced.');
 }
 async function cloudLoad(){
-  if(!confirm('Replace current data with the cloud save?')) return;
+  if(!__fbUser){ alert('Sign in first.'); return; }
+  if(!confirm('Discard local changes and pull the latest cloud version?')) return;
   try {
-    const { db, doc, getDoc } = await __fbInit();
-    const snap = await getDoc(doc(db, FB_COLL, FB_DOC));
-    if(!snap.exists()){ alert('No cloud save found yet.'); return; }
+    const snap = await __fb.getDoc(userDocRef());
+    if(!snap.exists()){ alert('No cloud data found yet.'); return; }
     const p = snap.data();
-    const raw = p.json || (p.data ? JSON.stringify(p.data) : null);
-    if(!raw){ alert('Cloud save looks empty.'); return; }
-    const d = JSON.parse(raw);
-    if(!d.F || !d.F.length){ alert('Cloud save has no fields.'); return; }
-    d.v = 7;
-    localStorage.setItem(SK, JSON.stringify(d));
+    if(!p.json){ alert('Cloud doc is empty.'); return; }
+    localStorage.setItem(SK, p.json);
     location.reload();
-  } catch(e){ alert('Cloud load failed: '+e.message); }
+  } catch(e){ alert('Pull failed: '+e.message); }
 }
 </script>
 </body>
