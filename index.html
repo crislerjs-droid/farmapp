@@ -156,9 +156,21 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 <!-- Teammate-update banner (shown when remote changes arrive) -->
 <div id="update-banner" style="display:none;position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:9997;background:#2563eb;color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);" onclick="location.reload();" title="Click to refresh and load the latest changes">🔄 Updates from a teammate — click to refresh</div>
 
+<!-- Context picker (farm + year) — shown when ctx-pill is clicked -->
+<div id="ctx-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9996;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;" onclick="if(event.target===this)closeCtxPicker()">
+  <div style="background:#1e293b;color:#e2e8f0;padding:22px 26px;border-radius:8px;width:380px;max-width:92vw;max-height:80vh;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:16px;font-weight:600;">Workspace</div>
+      <button onclick="closeCtxPicker()" style="background:transparent;color:#94a3b8;border:0;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <div id="ctx-modal-body"><div style="color:#94a3b8;">Loading…</div></div>
+  </div>
+</div>
+
 <!-- Toolbar -->
 <div class="tb">
   <span class="tb-title" onclick="goHome()">🌾 FIELD COMMANDER</span>
+  <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;margin-left:8px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;">Loading…</span>
   <div class="tb-sep"></div>
   <span class="tb-stat" id="s-fields">0</span><span class="tb-lbl">fields</span>
   <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
@@ -605,7 +617,7 @@ function initMap(){
       let cx=0,cy=0;f.points.forEach(p=>{cx+=p[0];cy+=p[1];});cx/=f.points.length;cy/=f.points.length;
       if(bounds.contains(L.latLng(cx,cy))){sel.add(f.id);count++;}
     });
-    if(count>0){restyle();renderUI();}
+    if(count>0){restyle();renderUI();renderEventPanel();}
   });
   mapEl.addEventListener('contextmenu',function(e){if(e.shiftKey)e.preventDefault();});
 }
@@ -748,9 +760,9 @@ function restyle(){F.forEach(f=>{const l=layers[f.id];if(!l)return;l.setStyle({c
 function toggleSel(id){
   if(sel.has(id)){sel.delete(id);if(editId===id)editId=null;}
   else{sel.add(id);editId=id;if(mode==='variety'||mode==='crop')showEdit(id);}
-  restyle();renderUI();
+  restyle();renderUI();renderEventPanel();
 }
-function deselAll(){sel.clear();editId=null;restyle();renderUI();hidePanel('pan-edit');}
+function deselAll(){sel.clear();editId=null;restyle();renderUI();renderEventPanel();hidePanel('pan-edit');}
 const SEL_COLORS=['#EF4444','#3B82F6','#F59E0B','#8B5CF6','#10B981','#EC4899','#06B6D4','#F97316','#e8b931'];
 function cycleSelColor(){
   const idx=SEL_COLORS.indexOf(selColor);
@@ -897,6 +909,49 @@ function renderEventPanel(){
       mx.products.forEach(p=>{h+=esc(p.name)+' '+p.rate+' '+esc(p.unit)+'<br>';});
       h+='</div>';
     }
+    // Assigned fields — collapsible chip list with remove (✕) and unmark-applied (↺) controls.
+    // Default collapsed (busy panel otherwise). Expand state is per-session, not synced to teammates.
+    // Sorted: planned first (what's left to do up top), then applied; alphabetical within each group.
+    if(fids.length){
+      const expandKey=sub.id+':'+mx.id;
+      const expanded=__mixExpanded.has(expandKey);
+      h+='<div style="padding:4px 0 0 20px;font-size:10px;color:#aaa;" onclick="event.stopPropagation();">';
+      h+='<span style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation();toggleMixFields(\''+expandKey+'\');" title="Show/hide assigned fields">';
+      h+='<span style="display:inline-block;width:12px;text-align:center;color:#888;font-weight:700;font-size:12px;">'+(expanded?'−':'+')+'</span>';
+      h+='<span>Fields ('+fids.length+')</span>';
+      h+='</span>';
+      if(expanded){
+        const sortedFids=fids.slice().sort((a,b)=>{
+          const ea=mx.fields[a],eb=mx.fields[b];
+          const sa=ea.status==='applied'?1:0, sb=eb.status==='applied'?1:0;
+          if(sa!==sb)return sa-sb;
+          const fa=F.find(x=>x.id==a),fb=F.find(x=>x.id==b);
+          return ((fa&&fa.name)||'').localeCompare((fb&&fb.name)||'');
+        });
+        h+='<div style="margin-top:3px;">';
+        sortedFids.forEach(fid=>{
+          const f=F.find(x=>x.id==fid);if(!f)return;
+          const ef=mx.fields[fid];
+          const isApplied=ef.status==='applied';
+          const accent=isApplied?'#22c55e':'#666';
+          h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#262626;padding:2px 4px 2px 6px;border-radius:3px;border-left:3px solid '+accent+';margin:1px 2px 1px 0;font-size:10px;vertical-align:middle;">';
+          h+='<span style="color:#ddd;">'+esc(f.name)+'</span>';
+          if(isApplied){
+            let metaTxt=fmtDate(ef.dateApplied);
+            if(ef.applicator) metaTxt+=' · '+ef.applicator;
+            if(ef.vendor) metaTxt+=' · from '+ef.vendor;
+            h+='<span style="color:#888;font-size:9px;">'+esc(metaTxt)+'</span>';
+            h+='<button class="tb-btn" onclick="event.stopPropagation();unmarkApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;" title="Undo — revert to planned">↺</button>';
+          } else {
+            h+='<button class="tb-btn" onclick="event.stopPropagation();markFieldApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#22c55e;border-color:#22c55e;" title="Mark only this field as applied (uses the date + applicator in the Mark Complete form below)">✓</button>';
+          }
+          h+='<button class="tb-btn" onclick="event.stopPropagation();removeFieldFromMix('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#ef4444;border-color:#ef4444;" title="Remove field from this mix">✕</button>';
+          h+='</span>';
+        });
+        h+='</div>';
+      }
+      h+='</div>';
+    }
     h+='<textarea class="fp-ta" style="min-height:30px;font-size:10px;margin-top:4px;" onclick="event.stopPropagation();" '
       +'onchange="getActiveSub().mixes['+i+'].notes=this.value;save();" placeholder="Notes / recipe details...">'+esc(mx.notes||'')+'</textarea>';
     h+='</div>';
@@ -928,8 +983,34 @@ function renderEventPanel(){
   applicators.forEach(a=>{h+='<option>'+esc(a)+'</option>';});
   h+='<option value="__new__">+ Add New</option>';
   h+='</select></div>';
+  // Fertilizer is bought at application time, not pre-purchased like chemicals,
+  // so capture which vendor delivered/sold it for this application.
+  if(activeCategory==='fertilizer'){
+    h+='<div class="fp-row">';
+    h+='<select class="tb-sel" id="ev-apply-vendor" style="flex:1;" title="Vendor that supplied the fertilizer for this application">';
+    h+='<option value="">— Source (vendor) —</option>';
+    vendors.forEach(v=>{h+='<option>'+esc(v)+'</option>';});
+    h+='<option value="__new__">+ Add New</option>';
+    h+='</select></div>';
+  }
+  // Mark Complete button — count what will actually change so the user isn't
+  // afraid of clobbering already-applied fields. The function only ever touches
+  // planned ones, but the label needs to make that obvious.
+  let plannedCountInMix=0;
+  let plannedSelectedInSub=0;
+  const activeMix=sub.mixes[activeMixIdx];
+  if(activeMix) plannedCountInMix=Object.values(activeMix.fields).filter(ef=>ef.status==='planned').length;
+  if(sel.size>0){
+    sel.forEach(id=>{sub.mixes.forEach(mx=>{const ef=mx.fields[id];if(ef&&ef.status==='planned')plannedSelectedInSub++;});});
+  }
+  const btnLabel = sel.size>0
+    ? '✓ Mark '+plannedSelectedInSub+' Selected as Applied'
+    : '✓ Mark '+plannedCountInMix+' Remaining as Applied';
+  const btnDisabled = sel.size>0 ? plannedSelectedInSub===0 : plannedCountInMix===0;
+  const btnTitle = 'Only planned fields are affected — already-applied fields keep their original date and applicator. '
+    + (sel.size>0 ? 'Marks only the planned fields in your map selection.' : 'Marks every still-planned field in this mix.');
   h+='<div class="fp-row" style="gap:4px;">';
-  h+='<button class="tb-btn" onclick="markApplied()" style="background:#22c55e;color:#111;border:none;flex:1;font-size:11px;" title="If fields are selected, marks only those as applied. Otherwise marks all planned fields in the active mix.">✓ '+(sel.size>0?'Mark '+sel.size+' Selected':'Complete Entire Mix')+'</button>';
+  h+='<button class="tb-btn" onclick="markApplied()" '+(btnDisabled?'disabled':'')+' style="background:'+(btnDisabled?'#374151':'#22c55e')+';color:'+(btnDisabled?'#6b7280':'#111')+';border:none;flex:1;font-size:11px;cursor:'+(btnDisabled?'not-allowed':'pointer')+';" title="'+esc(btnTitle)+'">'+btnLabel+'</button>';
   h+='</div>';
   h+='<div style="font-size:9px;color:#666;margin-top:2px;">Usage (acres × rate) gets deducted from your inventory when you mark applied.</div>';
   h+='</div>';
@@ -1170,22 +1251,144 @@ function clearSprayAll(){
   sub.mixes.forEach(mx=>{mx.fields={};});
   restyle();renderUI();renderEventPanel();renderPills();save();
 }
-function markApplied(){
+// Per-chip controls + collapsible field-list state, invoked from renderEventPanel.
+// __mixExpanded is per-session (not synced to teammates) so each user's expand
+// preferences don't pollute the shared workspace.
+const __mixExpanded=new Set();
+function toggleMixFields(key){
+  if(__mixExpanded.has(key))__mixExpanded.delete(key);
+  else __mixExpanded.add(key);
+  renderEventPanel();
+}
+function removeFieldFromMix(mixIdx,fid){
   const sub=getActiveSub();if(!sub)return;
+  const mx=sub.mixes[mixIdx];if(!mx)return;
+  removeAutoItemsForEvent(eventKey(activeCategory, sub.id, mx.id, fid));
+  delete mx.fields[fid];
+  restyle();renderUI();renderEventPanel();renderPills();save();
+}
+function unmarkApplied(mixIdx,fid){
+  const sub=getActiveSub();if(!sub)return;
+  const mx=sub.mixes[mixIdx];if(!mx)return;
+  const ef=mx.fields[fid];if(!ef)return;
+  ef.status='planned';ef.dateApplied=null;ef.applicator=null;
+  delete ef.vendor;
+  removeAutoItemsForEvent(eventKey(activeCategory, sub.id, mx.id, fid));
+  restyle();renderUI();renderEventPanel();renderPills();save();
+}
+// Read date + applicator (and fert vendor) from the Mark Complete form.
+// Returns null if invalid (caller should bail). Handles "+ Add New" inline.
+function getApplyFormValues(){
   const dt=document.getElementById('ev-apply-date').value;
   let who=document.getElementById('ev-apply-who').value;
-  if(who==='__new__'){const n=prompt('New applicator name:');if(!n)return;applicators.push(n);who=n;save();}
-  if(!dt){alert('Select a date.');return;}
-  let marked=0;
+  if(who==='__new__'){const n=prompt('New applicator name:');if(!n)return null;applicators.push(n);who=n;save();}
+  if(!dt){alert('Select a date.');return null;}
+  let vendor='';
+  if(activeCategory==='fertilizer'){
+    const vSel=document.getElementById('ev-apply-vendor');
+    vendor=(vSel&&vSel.value)||'';
+    if(vendor==='__new__'){const n=prompt('New fertilizer vendor name:');if(!n)return null;vendors.push(n);vendor=n;save();}
+  }
+  return {dt, who, vendor};
+}
+function applyEventFields(ef, v){
+  ef.status='applied';
+  ef.dateApplied=v.dt;
+  ef.applicator=v.who;
+  if(v.vendor) ef.vendor=v.vendor; else delete ef.vendor;
+}
+// Stable identifier for a single field-event so auto-purchase items can be
+// linked back to their source application and cleaned up if it's reverted.
+function eventKey(cat, subId, mixId, fid){ return cat+'/'+subId+'/'+mixId+'/'+fid; }
+
+// Strip every auto-generated purchase item that came from this event. If a
+// container auto-purchase ends up empty, drop it.
+function removeAutoItemsForEvent(evKey){
+  for(let i=purchases.length-1; i>=0; i--){
+    const p=purchases[i];
+    p.items=(p.items||[]).filter(it => it.autoFromEvent !== evKey);
+    if(p.autoGenerated && (!p.items || p.items.length===0)){
+      purchases.splice(i,1);
+    }
+  }
+}
+
+// Fertilizer is bought at delivery, not pre-purchased. When a fert event is
+// marked applied with a vendor, we synthesize matching purchase items so the
+// vendor report + inventory naturally include the delivery. Items carry
+// autoFromEvent for cleanup; multiple events from the same vendor on the same
+// day roll up into a single auto-purchase. The user fills in unitPrice when
+// the bill arrives. Manual purchases are never touched.
+function createOrUpdateAutoPurchase(ef, sub, mx, fid, cat){
+  if(cat !== 'fertilizer') return;
+  if(!ef.vendor || !ef.dateApplied) return;
+  const f=F.find(x=>x.id==fid); if(!f) return;
+  const products=mx.products || [];
+  if(!products.length) return;
+
+  const evKey=eventKey(cat, sub.id, mx.id, fid);
+  removeAutoItemsForEvent(evKey); // idempotent re-mark
+
+  let p=purchases.find(p => p.autoGenerated && p.vendor===ef.vendor && p.date===ef.dateApplied);
+  if(!p){
+    p={ id:purchaseNid++, date:ef.dateApplied, vendor:ef.vendor, location:'',
+        type:'fertilizer', items:[], autoGenerated:true };
+    purchases.push(p);
+  }
+
+  products.forEach(prod=>{
+    if(!prod || !prod.name) return;
+    const rate=parseFloat(prod.rate) || 0;
+    const acres=f.acres || 0;
+    if(!rate || !acres) return;
+    p.items.push({
+      product: prod.name,
+      qty: acres*rate,
+      unit: (prod.unit||'').replace(/\/\s*ac$/i,'').trim(),
+      unitPrice: 0,
+      splits: [{ crop: f.crop||'', category: 'Fertilizer', amount: 0 }],
+      autoFromEvent: evKey,
+      autoNote: f.name + (f.farm?' ('+f.farm+')':'') + ' · ' + acres.toFixed(1) + ' ac'
+    });
+  });
+}
+
+function markApplied(){
+  const sub=getActiveSub();if(!sub)return;
+  const v=getApplyFormValues();if(!v)return;
+  const cat=activeCategory;
   if(sel.size>0){
-    sel.forEach(id=>{sub.mixes.forEach(mx=>{const ef=mx.fields[id];if(ef&&ef.status==='planned'){ef.status='applied';ef.dateApplied=dt;ef.applicator=who;marked++;}});});
+    sel.forEach(id=>{sub.mixes.forEach(mx=>{
+      const ef=mx.fields[id];
+      if(ef && ef.status==='planned'){
+        applyEventFields(ef,v);
+        createOrUpdateAutoPurchase(ef, sub, mx, id, cat);
+      }
+    });});
   }else{
-    // Mark all planned in active mix
-    const mx=sub.mixes[activeMixIdx];if(mx){
-      Object.values(mx.fields).forEach(ef=>{if(ef.status==='planned'){ef.status='applied';ef.dateApplied=dt;ef.applicator=who;marked++;}});
+    const mx=sub.mixes[activeMixIdx];
+    if(mx){
+      Object.keys(mx.fields).forEach(fid=>{
+        const ef=mx.fields[fid];
+        if(ef.status==='planned'){
+          applyEventFields(ef,v);
+          createOrUpdateAutoPurchase(ef, sub, mx, fid, cat);
+        }
+      });
     }
   }
   sel.clear();editId=null;restyle();renderUI();renderEventPanel();renderPills();save();
+}
+// Mark exactly one chip's field as applied, using whatever's in the Mark Complete form.
+// Lets the user run several applicators / dates through the same mix, one click at a time.
+function markFieldApplied(mixIdx,fid){
+  const sub=getActiveSub();if(!sub)return;
+  const mx=sub.mixes[mixIdx];if(!mx)return;
+  const ef=mx.fields[fid];if(!ef||ef.status==='applied')return;
+  const v=getApplyFormValues();if(!v)return;
+  applyEventFields(ef,v);
+  createOrUpdateAutoPurchase(ef, sub, mx, fid, activeCategory);
+  restyle();renderUI();renderEventPanel();renderPills();save();
 }
 
 // Send spray order: print selected fields as filled (work order for applicators)
@@ -1901,6 +2104,8 @@ function generateApplicatorReport(){
       events.push({
         date:ef.dateApplied||'',
         applicator:ef.applicator||'?',
+        cat:cat, // 'spray' or 'fertilizer' — keeps types separate in the report
+        vendor:ef.vendor||'', // fertilizer-only; populated when entered at apply time
         field:f,
         farm:f.farm||'',
         crop:f.crop||'Unknown',
@@ -1918,26 +2123,42 @@ function generateApplicatorReport(){
     return;
   }
 
-  // Group by (date, crop). Key preserves the ISO date for sorting.
-  // If looking at all applicators, include applicator in the grouping key too so rows don't merge.
+  // Group by (date, category, crop) so spray and fertilizer never merge into
+  // the same row. For fertilizer, also group by vendor since the vendor is
+  // tracked per-application (bought at delivery, not pre-purchased).
   const buckets={};
   events.forEach(e=>{
+    const vendorPart = e.cat==='fertilizer' ? '|'+(e.vendor||'') : '';
     const key=appReportFilter.applicator
-      ? (e.date||'undated')+'|'+e.crop
-      : (e.date||'undated')+'|'+e.applicator+'|'+e.crop;
+      ? (e.date||'undated')+'|'+e.cat+'|'+e.crop+vendorPart
+      : (e.date||'undated')+'|'+e.applicator+'|'+e.cat+'|'+e.crop+vendorPart;
     if(!buckets[key])buckets[key]={
-      date:e.date,applicator:e.applicator,crop:e.crop,
-      acres:0,fieldCount:0,fields:[],mixes:new Set()
+      date:e.date,applicator:e.applicator,cat:e.cat,crop:e.crop,vendor:e.vendor||'',
+      acres:0,fieldCount:0,fields:[],mixes:new Set(),
+      // Per-product totals (qty × acres). Used for fertilizer to show pounds delivered.
+      amounts:{} // key = name + '|' + unit; value = {name, unit, qty}
     };
     const b=buckets[key];
     b.acres+=e.acres;
     b.fieldCount++;
     b.fields.push({name:e.field.name,farm:e.farm,acres:e.acres,mixName:e.mixName,mixColor:e.mixColor,products:e.products});
     b.mixes.add(e.mixName);
+    // Sum product amounts for fertilizer so the detail can show "X lb of Urea, Y lb of DAP" etc.
+    if(e.cat==='fertilizer'){
+      (e.products||[]).forEach(p=>{
+        if(!p||!p.name)return;
+        const rate=parseFloat(p.rate)||0;
+        if(!rate)return;
+        const ak=p.name+'|'+(p.unit||'');
+        if(!b.amounts[ak]) b.amounts[ak]={name:p.name,unit:p.unit||'',qty:0};
+        b.amounts[ak].qty += (e.acres||0) * rate;
+      });
+    }
   });
   const bucketList=Object.values(buckets).sort((a,b)=>{
     if(a.date!==b.date)return (a.date||'').localeCompare(b.date||'');
     if(a.applicator!==b.applicator)return a.applicator.localeCompare(b.applicator);
+    if(a.cat!==b.cat)return a.cat.localeCompare(b.cat);
     return a.crop.localeCompare(b.crop);
   });
 
@@ -1984,25 +2205,33 @@ function generateApplicatorReport(){
   body+='<thead><tr style="background:#111;color:#fff;">';
   body+='<th style="padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.5px;">Date</th>';
   if(!appReportFilter.applicator)body+='<th style="padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.5px;">Applicator</th>';
+  body+='<th style="padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.5px;">Type</th>';
   body+='<th style="padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.5px;">Crop</th>';
+  body+='<th style="padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.5px;">Source</th>';
   body+='<th style="padding:8px 10px;text-align:right;font-size:10px;letter-spacing:.5px;">Fields</th>';
   body+='<th style="padding:8px 10px;text-align:right;font-size:10px;letter-spacing:.5px;">Acres</th>';
   if(hasRate)body+='<th style="padding:8px 10px;text-align:right;font-size:10px;letter-spacing:.5px;">Expected $</th>';
   body+='</tr></thead><tbody>';
+  // Strips trailing "/ac" so "lb/ac" displays as "lb" when showing totals (rate × acres).
+  function unitFromRate(u){return (u||'').replace(/\/\s*ac$/i,'').trim();}
   bucketList.forEach((b,i)=>{
     const bg=i%2?'#fafaf7':'#fff';
     const dateStr=b.date?formatShortDate(b.date):'—';
+    const catLabel=CAT_LABELS[b.cat]||b.cat;
+    const sourceTxt = b.cat==='fertilizer' ? (b.vendor || '—') : '';
     body+='<tr style="background:'+bg+';">';
     body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;font-variant-numeric:tabular-nums;font-weight:600;">'+esc(dateStr)+'</td>';
     if(!appReportFilter.applicator)body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;">'+esc(b.applicator)+'</td>';
+    body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;">'+esc(catLabel)+'</td>';
     body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;">'+esc(b.crop)+'</td>';
+    body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;color:'+(b.cat==='fertilizer'?'#111':'#bbb')+';">'+esc(sourceTxt)+'</td>';
     body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;color:#555;font-variant-numeric:tabular-nums;">'+b.fieldCount+'</td>';
     body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">'+b.acres.toFixed(1)+'</td>';
     if(hasRate)body+='<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">$'+(b.acres*rate).toFixed(2)+'</td>';
     body+='</tr>';
   });
-  // Total row
-  const colspan=(appReportFilter.applicator?3:4);
+  // Total row colspan = Date | Applicator? | Type | Crop | Source | Fields
+  const colspan=(appReportFilter.applicator?5:6);
   body+='<tr style="background:#111;color:#fff;"><td colspan="'+colspan+'" style="padding:10px;text-align:right;font-weight:700;font-size:11px;">TOTAL</td>';
   body+='<td style="padding:10px;text-align:right;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;">'+totalAcres.toFixed(1)+'</td>';
   if(hasRate)body+='<td style="padding:10px;text-align:right;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;">$'+totalExpected.toFixed(2)+'</td>';
@@ -2037,9 +2266,10 @@ function generateApplicatorReport(){
   body+='<div style="font-size:10px;color:#888;margin-bottom:8px;">Fields making up each bucket above. For when numbers don\'t match the bill and you need to see which fields are counted.</div>';
   bucketList.forEach(b=>{
     const dateStr=b.date?formatShortDate(b.date):'—';
+    const catLabel=CAT_LABELS[b.cat]||b.cat;
     body+='<div style="margin-bottom:10px;padding:6px 10px;border-left:3px solid #111;background:#fafaf7;">';
     body+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">';
-    body+='<div><strong style="font-size:12px;">'+esc(dateStr)+' · '+esc(b.crop)+'</strong>';
+    body+='<div><strong style="font-size:12px;">'+esc(dateStr)+' · '+esc(catLabel)+' · '+esc(b.crop)+'</strong>';
     if(!appReportFilter.applicator)body+=' <span style="color:#666;font-size:10px;">('+esc(b.applicator)+')</span>';
     body+='</div>';
     body+='<span style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">'+b.acres.toFixed(1)+' ac</span>';
@@ -2047,6 +2277,17 @@ function generateApplicatorReport(){
     // Mixes present in this bucket
     const mixList=[...b.mixes].filter(Boolean);
     if(mixList.length)body+='<div style="font-size:9px;color:#666;margin-bottom:3px;">Mix: '+mixList.map(esc).join(', ')+'</div>';
+    // Fertilizer-only: vendor + per-product totals (acres × rate). Helps reconcile
+    // the application against the delivery ticket from the supplier.
+    if(b.cat==='fertilizer'){
+      if(b.vendor) body+='<div style="font-size:9px;color:#666;margin-bottom:3px;">Source: <strong>'+esc(b.vendor)+'</strong></div>';
+      const amts=Object.values(b.amounts||{}).filter(a=>a.qty>0);
+      if(amts.length){
+        body+='<div style="font-size:10px;color:#333;margin-bottom:3px;font-weight:600;">';
+        body+=amts.map(a=>a.qty.toLocaleString(undefined,{maximumFractionDigits:1})+' '+esc(unitFromRate(a.unit))+' '+esc(a.name)).join(' · ');
+        body+='</div>';
+      }
+    }
     // Field list — one per line, compact
     b.fields.sort((a,b)=>a.name.localeCompare(b.name));
     body+='<div style="font-size:10px;columns:2;column-gap:16px;">';
@@ -3768,18 +4009,19 @@ window.addEventListener('DOMContentLoaded',()=>{
   fbBoot(); // gates app behind auth, hydrates from cloud, then runs the local boot path
 });
 
-// === FIREBASE: SHARED TEAM WORKSPACE ===
+// === FIREBASE: MULTI-FARM, MULTI-YEAR WORKSPACE ===
 // Architecture:
-// - Google sign-in gates the app; only allowlisted emails (in firestore.rules)
-//   can read/write. Unauthorized accounts are signed out with a clear message.
-// - Single shared doc at state/main holds the team's data as a JSON string.
-//   Last-write-wins on conflicts (acceptable for ~3 users not editing the
-//   same field at the same second; per-entity locking is a later port).
-// - Auto-sync: every save() schedules a debounced cloud write (1.5s).
-// - Real-time: onSnapshot listens for teammate writes; on remote change a
-//   refresh banner is shown so the user controls when state is replaced
-//   (avoids stomping on whatever they're typing).
-// - clientId tag distinguishes our own writes from teammates'.
+// - Each farm is a workspace at farms/{farmId} with members[] (email allowlist).
+// - Per-year state at farms/{farmId}/years/{year} as a JSON-string blob.
+// - Self-service: any signed-in user can create their own farm; members are
+//   invited by email through the workspace picker UI.
+// - Per-session globals: __fbUser (Auth user), __farmId/__farmDoc (current farm),
+//   __year (current year label).
+// - Auto-sync writes to the current year doc on every save() (debounced 1.5s).
+// - onSnapshot on the current year doc shows a refresh banner when teammates
+//   write; clientId tag distinguishes our own writes.
+// - localStorage holds a single mirror of the current farm+year for offline use.
+// - One-time legacy migration from the old state/main doc for the original user.
 const FB_CONFIG = {
   apiKey: "AIzaSyBjO2EHtOlg-G2_fqFmO0awq-pMq2_fBko",
   authDomain: "farm-app-6e176.firebaseapp.com",
@@ -3791,12 +4033,19 @@ const FB_CONFIG = {
 };
 const FB_VER = '12.12.1';
 const SYNC_DEBOUNCE_MS = 1500;
+const LS_FARM = 'fc_farm';
+const LS_YEAR = 'fc_year';
+const LEGACY_OWNER_EMAIL = 'twlakesfarm@gmail.com'; // Only this email sees the legacy-migration prompt.
 const __clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
 let __fb = null;
 let __fbUser = null;
+let __farmId = null;
+let __farmDoc = null;       // { name, currentYear, members[], years[] }
+let __year = null;
 let __syncTimer = null;
 let __bootDone = false;
 let __snapshotUnsub = null;
+let __myFarmsCache = null;  // populated when context picker opens
 
 async function __fbInit(){
   if(__fb) return __fb;
@@ -3807,7 +4056,10 @@ async function __fbInit(){
   __fb = {
     db: f.getFirestore(app),
     auth: u.getAuth(app),
-    doc: f.doc, setDoc: f.setDoc, getDoc: f.getDoc, onSnapshot: f.onSnapshot,
+    doc: f.doc, setDoc: f.setDoc, getDoc: f.getDoc, updateDoc: f.updateDoc,
+    addDoc: f.addDoc, collection: f.collection,
+    query: f.query, where: f.where, getDocs: f.getDocs,
+    onSnapshot: f.onSnapshot,
     signInWithEmailAndPassword: u.signInWithEmailAndPassword,
     createUserWithEmailAndPassword: u.createUserWithEmailAndPassword,
     fbSignOut: u.signOut,
@@ -3897,19 +4149,23 @@ async function fbSignOut(){
   location.reload();
 }
 
-function teamDocRef(){
+function farmDocRef(farmId){
   if(!__fb) return null;
-  return __fb.doc(__fb.db, 'state', 'main');
+  return __fb.doc(__fb.db, 'farms', farmId || __farmId);
+}
+function yearDocRef(farmId, year){
+  if(!__fb) return null;
+  return __fb.doc(__fb.db, 'farms', farmId || __farmId, 'years', year || __year);
 }
 
 async function cloudSyncNow(){
-  if(!__fbUser || !__bootDone) return;
+  if(!__fbUser || !__bootDone || !__farmId || !__year) return;
   try {
     setSync('syncing');
     save();
     const raw = localStorage.getItem(SK);
     if(!raw){ setSync('synced'); return; }
-    await __fb.setDoc(teamDocRef(), {
+    await __fb.setDoc(yearDocRef(), {
       v: 7,
       json: raw,
       ts: Date.now(),
@@ -3924,7 +4180,7 @@ async function cloudSyncNow(){
 }
 
 function scheduleCloudSync(){
-  if(!__fbUser || !__bootDone) return;
+  if(!__fbUser || !__bootDone || !__farmId || !__year) return;
   setSync('syncing');
   if(__syncTimer) clearTimeout(__syncTimer);
   __syncTimer = setTimeout(cloudSyncNow, SYNC_DEBOUNCE_MS);
@@ -3937,6 +4193,336 @@ save = function(){
   scheduleCloudSync();
 };
 
+// --- Farm/year management ---
+
+async function loadMyFarms(){
+  if(!__fbUser) return [];
+  const { db, collection, query, where, getDocs } = __fb;
+  const email = (__fbUser.email || '').toLowerCase();
+  try {
+    const q = query(collection(db, 'farms'), where('members', 'array-contains', email));
+    const snap = await getDocs(q);
+    const out = [];
+    snap.forEach(d => out.push({ id: d.id, ...d.data() }));
+    return out;
+  } catch(e){
+    console.error('loadMyFarms failed:', e);
+    return [];
+  }
+}
+
+async function createFarm(name){
+  if(!__fbUser) throw new Error('Not signed in');
+  const { db, collection, addDoc, doc, setDoc } = __fb;
+  const year = String(new Date().getFullYear());
+  const email = (__fbUser.email || '').toLowerCase();
+  const farmRef = await addDoc(collection(db, 'farms'), {
+    name: name,
+    currentYear: year,
+    years: [year],
+    members: [email],
+    createdAt: Date.now(),
+    createdBy: email
+  });
+  // Seed the year doc with whatever's currently in localStorage, or empty state.
+  const seed = localStorage.getItem(SK) || JSON.stringify({ v:7, F:[], subcategories:{spray:[],fertilizer:[]} });
+  await setDoc(doc(db, 'farms', farmRef.id, 'years', year), {
+    v: 7, json: seed, ts: Date.now(),
+    editedBy: email, clientId: __clientId
+  });
+  return farmRef.id;
+}
+
+// One-time bring-over from the old state/main doc, for the original user.
+async function tryLegacyMigration(){
+  if(!__fbUser) return null;
+  if((__fbUser.email || '').toLowerCase() !== LEGACY_OWNER_EMAIL) return null;
+  try {
+    const { db, doc, getDoc, addDoc, setDoc, collection } = __fb;
+    const legSnap = await getDoc(doc(db, 'state', 'main'));
+    if(!legSnap.exists()) return null;
+    const legData = legSnap.data();
+    if(!legData.json) return null;
+    let farmName = 'Twin Lakes Farm II';
+    try {
+      const parsed = JSON.parse(legData.json);
+      if(parsed.farmInfo && parsed.farmInfo.name) farmName = parsed.farmInfo.name;
+    } catch(_){}
+    if(!confirm(`Existing data found from before the multi-farm upgrade.\n\nMigrate it into a new farm called "${farmName}" for the 2026 crop year?`)) return null;
+    const year = '2026';
+    const email = (__fbUser.email || '').toLowerCase();
+    const farmRef = await addDoc(collection(db, 'farms'), {
+      name: farmName,
+      currentYear: year,
+      years: [year],
+      members: [email],
+      createdAt: Date.now(),
+      createdBy: email
+    });
+    await setDoc(doc(db, 'farms', farmRef.id, 'years', year), {
+      v: 7, json: legData.json, ts: Date.now(),
+      editedBy: email, clientId: __clientId
+    });
+    return farmRef.id;
+  } catch(e){
+    console.error('Legacy migration check failed:', e);
+    return null;
+  }
+}
+
+async function enterFarm(farmId){
+  const { db, doc, getDoc, setDoc, onSnapshot } = __fb;
+  const fSnap = await getDoc(doc(db, 'farms', farmId));
+  if(!fSnap.exists()) throw new Error('Farm not found');
+  __farmId = farmId;
+  __farmDoc = fSnap.data();
+  localStorage.setItem(LS_FARM, farmId);
+
+  // Pick year: saved choice (if it's a valid year for this farm) else farm.currentYear.
+  const savedYear = localStorage.getItem(LS_YEAR);
+  __year = (savedYear && (__farmDoc.years || []).includes(savedYear))
+    ? savedYear
+    : __farmDoc.currentYear;
+  localStorage.setItem(LS_YEAR, __year);
+
+  // Hydrate localStorage from the year doc.
+  const yref = doc(db, 'farms', farmId, 'years', __year);
+  const ySnap = await getDoc(yref);
+  if(ySnap.exists() && ySnap.data().json){
+    localStorage.setItem(SK, ySnap.data().json);
+  } else {
+    // Year doc doesn't exist yet — seed empty.
+    const emptyJson = JSON.stringify({ v:7, F:[], subcategories:{spray:[],fertilizer:[]} });
+    localStorage.setItem(SK, emptyJson);
+    await setDoc(yref, {
+      v: 7, json: emptyJson, ts: Date.now(),
+      editedBy: __fbUser.email, clientId: __clientId
+    });
+  }
+
+  // Hand off to the original local-boot path against hydrated localStorage.
+  let ok = false;
+  try { ok = loadSaved(); } catch(e){ console.error(e); }
+  if(ok && F.length > 0){ boot(); }
+  else if(EMB && EMB.features && EMB.features.length > 0){ F=[]; nid=1; impGJ(EMB); boot(); }
+  else { renderUI(); }
+
+  __bootDone = true;
+  showSignInUI(false);
+  setSync(navigator.onLine ? 'synced' : 'offline');
+  updateCtxPill();
+
+  // Real-time listener: alert when a teammate updates this year's doc.
+  __snapshotUnsub = onSnapshot(yref, (snap) => {
+    if(!__bootDone) return;
+    if(!snap.exists()) return;
+    if(snap.metadata.hasPendingWrites) return;
+    const data = snap.data();
+    if(data.clientId === __clientId) return;
+    showUpdateBanner(data.editedBy);
+  }, (err) => console.error('Snapshot error:', err));
+}
+
+// Carry-forward transform: clone old year, reset per-year fields.
+function carryForwardYearJson(oldRaw){
+  let d;
+  try { d = JSON.parse(oldRaw); } catch(_){ return JSON.stringify({ v:7, F:[], subcategories:{spray:[],fertilizer:[]} }); }
+  // Reset per-field crop/variety/plantDate (keep field geometry, name, acres, farm).
+  (d.F || []).forEach(f => { f.crop = ''; f.variety = ''; f.plantDate = ''; });
+  // Reset mix field-assignments (keep recipes & subcategory structure).
+  if(d.subcategories){
+    Object.keys(d.subcategories).forEach(cat => {
+      (d.subcategories[cat] || []).forEach(sub => {
+        (sub.mixes || []).forEach(mx => { mx.fields = {}; });
+      });
+    });
+  }
+  // Reset purchases & bills entirely (per-year financial state).
+  d.purchases = []; d.purchaseNid = 1;
+  d.bills = []; d.billNid = 1;
+  return JSON.stringify(d);
+}
+
+async function startNewCropYear(){
+  if(!__farmId || !__year || !__farmDoc) return;
+  const next = prompt(
+    `Start a new crop year. The new year carries over field geometry, vendors, applicators, mix recipes, traits, colors, applicator rates, and farm info. It resets per-field crop/variety/plantDate, mix field assignments + applied events, purchases, and bills.\n\nCurrent year: ${__year}\nNew year label:`,
+    String(parseInt(__year, 10) + 1 || (new Date().getFullYear() + 1))
+  );
+  if(!next) return;
+  const newYear = next.trim();
+  if(!newYear) return;
+  if((__farmDoc.years || []).includes(newYear)){
+    alert(`Year "${newYear}" already exists. Switch to it instead via the picker.`);
+    return;
+  }
+  setSync('syncing', 'Creating new year…');
+  try {
+    await cloudSyncNow(); // flush latest edits to current year first
+    const raw = localStorage.getItem(SK);
+    if(!raw) throw new Error('Nothing to carry forward.');
+    const newJson = carryForwardYearJson(raw);
+    const { db, doc, setDoc, updateDoc } = __fb;
+    await setDoc(doc(db, 'farms', __farmId, 'years', newYear), {
+      v: 7, json: newJson, ts: Date.now(),
+      editedBy: __fbUser.email, clientId: __clientId
+    });
+    await updateDoc(doc(db, 'farms', __farmId), {
+      currentYear: newYear,
+      years: (__farmDoc.years || []).concat([newYear])
+    });
+    localStorage.setItem(LS_YEAR, newYear);
+    localStorage.setItem(SK, newJson);
+    location.reload();
+  } catch(e){
+    console.error('startNewCropYear failed:', e);
+    alert('Failed to start new crop year: ' + e.message);
+    setSync('error');
+  }
+}
+
+async function inviteMember(email){
+  if(!__farmId || !__farmDoc) return;
+  email = (email || '').trim().toLowerCase();
+  if(!email || !email.includes('@')){ alert('Enter a valid email.'); return; }
+  if((__farmDoc.members || []).includes(email)){ alert('Already a member.'); return; }
+  try {
+    const newMembers = (__farmDoc.members || []).concat([email]);
+    await __fb.updateDoc(__fb.doc(__fb.db, 'farms', __farmId), { members: newMembers });
+    __farmDoc.members = newMembers;
+    renderCtxPickerBody();
+    const inviteInput = document.getElementById('ctx-invite-email');
+    if(inviteInput) inviteInput.value = '';
+    alert(`Invited ${email}.\n\nThey can now sign up at this app's URL with that email and they'll see ${__farmDoc.name}.`);
+  } catch(e){
+    alert('Invite failed: ' + e.message);
+  }
+}
+
+async function removeMember(email){
+  if(!__farmId || !__farmDoc) return;
+  email = (email || '').toLowerCase();
+  if(email === (__fbUser.email || '').toLowerCase()){ alert("Can't remove yourself."); return; }
+  if(!confirm(`Remove ${email} from ${__farmDoc.name}?`)) return;
+  try {
+    const newMembers = (__farmDoc.members || []).filter(m => m !== email);
+    await __fb.updateDoc(__fb.doc(__fb.db, 'farms', __farmId), { members: newMembers });
+    __farmDoc.members = newMembers;
+    renderCtxPickerBody();
+  } catch(e){ alert('Remove failed: ' + e.message); }
+}
+
+// --- Context picker UI (farm + year switcher) ---
+
+function updateCtxPill(){
+  const el = document.getElementById('ctx-pill');
+  if(!el) return;
+  if(__farmDoc && __year){
+    el.textContent = `${__farmDoc.name} · ${__year} ▾`;
+    el.style.display = 'inline-block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function openCtxPicker(){
+  document.getElementById('ctx-modal').style.display = 'flex';
+  document.getElementById('ctx-modal-body').innerHTML = '<div style="color:#94a3b8;">Loading…</div>';
+  try {
+    __myFarmsCache = await loadMyFarms();
+    renderCtxPickerBody();
+  } catch(e){
+    document.getElementById('ctx-modal-body').innerHTML = `<div style="color:#dc2626;">${esc(e.message || 'Failed')}</div>`;
+  }
+}
+
+function closeCtxPicker(){
+  const m = document.getElementById('ctx-modal');
+  if(m) m.style.display = 'none';
+}
+
+function renderCtxPickerBody(){
+  const body = document.getElementById('ctx-modal-body');
+  if(!body || !__farmDoc) return;
+  let h = '';
+  // Years
+  h += '<div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Crop Year</div>';
+  const years = (__farmDoc.years || []).slice().sort();
+  years.forEach(y => {
+    const isCurrent = y === __year;
+    const isLatest = y === __farmDoc.currentYear;
+    h += `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:5px;background:${isCurrent?'#0f172a':'transparent'};margin-bottom:2px;cursor:pointer;border:1px solid ${isCurrent?'#3b82f6':'transparent'};" onclick="pickYear('${esc(y)}')">`;
+    h += `<span style="font-size:13px;${isCurrent?'color:#3b82f6;font-weight:600;':''}">${esc(y)}${isLatest?' <span style="font-size:9px;color:#22c55e;" title="Latest year">●</span>':''}</span>`;
+    h += `<span style="font-size:10px;color:#94a3b8;">${isCurrent?'open':'switch'}</span>`;
+    h += '</div>';
+  });
+  h += `<button onclick="startNewCropYear()" style="width:100%;background:transparent;color:#3b82f6;border:1px dashed #3b82f6;padding:6px;border-radius:5px;font-size:12px;cursor:pointer;margin-top:6px;">+ Start New Crop Year</button>`;
+
+  // Farms
+  h += '<div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin:18px 0 6px;">Farm</div>';
+  const farms = __myFarmsCache || [];
+  farms.forEach(f => {
+    const isCurrent = f.id === __farmId;
+    const memberCount = (f.members || []).length;
+    h += `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:5px;background:${isCurrent?'#0f172a':'transparent'};margin-bottom:2px;cursor:pointer;border:1px solid ${isCurrent?'#3b82f6':'transparent'};" onclick="pickFarm('${esc(f.id)}')">`;
+    h += `<span style="font-size:13px;${isCurrent?'color:#3b82f6;font-weight:600;':''}">${esc(f.name)}</span>`;
+    h += `<span style="font-size:10px;color:#94a3b8;">${memberCount} member${memberCount===1?'':'s'}</span>`;
+    h += '</div>';
+  });
+  h += `<button onclick="promptCreateFarm()" style="width:100%;background:transparent;color:#3b82f6;border:1px dashed #3b82f6;padding:6px;border-radius:5px;font-size:12px;cursor:pointer;margin-top:6px;">+ Create Another Farm</button>`;
+
+  // Members
+  h += '<div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin:18px 0 6px;">Members of ' + esc(__farmDoc.name) + '</div>';
+  (__farmDoc.members || []).forEach(m => {
+    const isMe = m === (__fbUser.email || '').toLowerCase();
+    h += `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;font-size:12px;color:#e2e8f0;">`;
+    h += `<span>${esc(m)}${isMe?' <span style="font-size:9px;color:#94a3b8;">(you)</span>':''}</span>`;
+    if(!isMe) h += `<button onclick="removeMember('${esc(m)}')" style="background:transparent;color:#dc2626;border:0;font-size:11px;cursor:pointer;padding:0;">remove</button>`;
+    h += '</div>';
+  });
+  h += `<div style="display:flex;gap:6px;margin-top:8px;">`;
+  h += `<input id="ctx-invite-email" type="email" placeholder="teammate@example.com" style="flex:1;background:#0f172a;color:#e2e8f0;border:1px solid #334155;padding:6px 8px;border-radius:4px;font-size:12px;" onkeydown="if(event.key==='Enter')inviteMember(this.value)">`;
+  h += `<button onclick="inviteMember(document.getElementById('ctx-invite-email').value)" style="background:#3b82f6;color:#fff;border:0;padding:6px 14px;border-radius:4px;font-size:12px;cursor:pointer;">Invite</button>`;
+  h += `</div>`;
+  h += `<div style="font-size:10px;color:#94a3b8;margin-top:4px;">They sign up at this URL with the same email to join.</div>`;
+  body.innerHTML = h;
+}
+
+async function pickYear(y){
+  if(y === __year){ closeCtxPicker(); return; }
+  closeCtxPicker();
+  try { await cloudSyncNow(); } catch(_){}
+  localStorage.setItem(LS_YEAR, y);
+  location.reload();
+}
+
+async function pickFarm(farmId){
+  if(farmId === __farmId){ closeCtxPicker(); return; }
+  closeCtxPicker();
+  try { await cloudSyncNow(); } catch(_){}
+  localStorage.setItem(LS_FARM, farmId);
+  localStorage.removeItem(LS_YEAR); // start with the picked farm's currentYear
+  location.reload();
+}
+
+async function promptCreateFarm(){
+  const name = prompt('Name your new farm:');
+  if(!name || !name.trim()) return;
+  setSync('syncing', 'Creating…');
+  try {
+    const id = await createFarm(name.trim());
+    closeCtxPicker();
+    localStorage.setItem(LS_FARM, id);
+    localStorage.removeItem(LS_YEAR);
+    location.reload();
+  } catch(e){
+    setSync('error');
+    alert('Failed to create farm: ' + e.message);
+  }
+}
+
+// --- Boot flow ---
+
 async function fbBoot(){
   showSignInUI(true, 'Connecting…');
   setSync('syncing', 'Connecting…');
@@ -3948,84 +4534,78 @@ async function fbBoot(){
     console.error(e);
     return;
   }
-  const { auth, getDoc, setDoc, onSnapshot, onAuthStateChanged, fbSignOut: signOutFn } = initialized;
+  const { auth, onAuthStateChanged, fbSignOut: signOutFn } = initialized;
 
   onAuthStateChanged(auth, async (user) => {
     __fbUser = user;
     if(__snapshotUnsub){ try { __snapshotUnsub(); } catch(_){} __snapshotUnsub = null; }
     if(!user){
       __bootDone = false;
-      showSignInUI(true, 'Sign in to access the team workspace.');
+      __farmId = null; __farmDoc = null; __year = null;
+      showSignInUI(true, 'Sign in or create your account.');
       setSync('signedout');
+      updateCtxPill();
       return;
     }
-    showSignInUI(true, 'Loading…');
-    setSync('syncing', 'Loading…');
-    const ref = teamDocRef();
+    showSignInUI(true, 'Loading your farms…');
+    setSync('syncing', 'Loading farms…');
     try {
-      const snap = await getDoc(ref);
-      if(snap.exists() && snap.data().json){
-        localStorage.setItem(SK, snap.data().json);
-      } else if(localStorage.getItem(SK)){
-        // No shared doc yet but we have local data — seed the team workspace.
-        await setDoc(ref, {
-          v: 7,
-          json: localStorage.getItem(SK),
-          ts: Date.now(),
-          editedBy: user.email || user.uid,
-          clientId: __clientId
-        });
+      let farms = await loadMyFarms();
+      if(farms.length === 0){
+        // First-time user: try the legacy migration, else prompt to create.
+        const migratedId = await tryLegacyMigration();
+        if(migratedId){
+          farms = await loadMyFarms();
+        } else {
+          showSignInUI(true, 'Create your first farm to get started.');
+          let name = null;
+          while(!name){
+            name = prompt(`Welcome, ${user.email}!\n\nName your farm to get started:`);
+            if(name === null){
+              try { await signOutFn(auth); } catch(_){}
+              return;
+            }
+            name = name.trim();
+            if(!name) name = null;
+          }
+          showSignInUI(true, 'Setting up your farm…');
+          await createFarm(name);
+          farms = await loadMyFarms();
+        }
       }
+      let farmToEnter = null;
+      const savedFarmId = localStorage.getItem(LS_FARM);
+      if(savedFarmId && farms.find(f => f.id === savedFarmId)){
+        farmToEnter = savedFarmId;
+      } else {
+        farmToEnter = farms[0].id;
+      }
+      await enterFarm(farmToEnter);
     } catch(e){
-      if(e && (e.code === 'permission-denied' || /permission/i.test(e.message || ''))){
-        alert(`${user.email || 'This account'} isn\'t on the access list for this app.\n\nAsk the admin to add you, or sign in with an authorized account.`);
-        try { await signOutFn(auth); } catch(_){}
-        return;
-      }
-      console.error('Cloud load failed, falling back to localStorage:', e);
-      setSync('error', 'Cloud load failed');
+      console.error('fbBoot failed:', e);
+      setSync('error', 'Setup failed');
+      showSignInUI(true, 'Setup failed: ' + (e.message || 'unknown error'));
     }
-
-    // Hand off to the original boot path against the (possibly cloud-hydrated) localStorage.
-    let ok = false;
-    try { ok = loadSaved(); } catch(e){ console.error(e); }
-    if(ok && F.length > 0){ boot(); }
-    else if(EMB && EMB.features && EMB.features.length > 0){ F=[]; nid=1; impGJ(EMB); boot(); }
-    else { renderUI(); }
-
-    __bootDone = true;
-    showSignInUI(false);
-    setSync(navigator.onLine ? 'synced' : 'offline');
-
-    // Real-time: alert when a teammate updates the shared doc.
-    __snapshotUnsub = onSnapshot(ref, (snap) => {
-      if(!__bootDone) return;
-      if(!snap.exists()) return;
-      if(snap.metadata.hasPendingWrites) return; // own optimistic write
-      const data = snap.data();
-      if(data.clientId === __clientId) return;    // server confirmation of our own write
-      showUpdateBanner(data.editedBy);
-    }, (err) => {
-      console.error('Snapshot error:', err);
-    });
   });
 
   window.addEventListener('online',  () => { if(__fbUser){ setSync('syncing'); cloudSyncNow(); } });
   window.addEventListener('offline', () => setSync('offline'));
 }
 
-// Manual triggers (kept in the menu as "Force Sync Now" / "Pull from Cloud").
+// Manual triggers (kept in the menu).
 async function cloudSave(){
   if(!__fbUser){ alert('Sign in first.'); return; }
+  if(!__farmId || !__year){ alert('No farm/year context yet.'); return; }
   await cloudSyncNow();
   alert('Synced.');
 }
 async function cloudLoad(){
   if(!__fbUser){ alert('Sign in first.'); return; }
+  if(!__farmId || !__year){ alert('No farm/year context yet.'); return; }
   if(!confirm('Discard local changes and pull the latest cloud version?')) return;
   try {
-    const snap = await __fb.getDoc(teamDocRef());
-    if(!snap.exists()){ alert('No team data in the cloud yet.'); return; }
+    const snap = await __fb.getDoc(yearDocRef());
+    if(!snap.exists()){ alert('No cloud data found yet.'); return; }
     const p = snap.data();
     if(!p.json){ alert('Cloud doc is empty.'); return; }
     localStorage.setItem(SK, p.json);
