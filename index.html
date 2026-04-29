@@ -13,7 +13,14 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
 .map-wrap{flex:1;position:relative;min-height:0;}
 
 /* Toolbar */
-.tb{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;flex-wrap:wrap;z-index:100;}
+.tb{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;flex-wrap:wrap;z-index:100;width:100%;box-sizing:border-box;position:sticky;top:0;}
+/* Narrow screens (iPhone, small tablets): compress toolbar so it wraps cleanly */
+@media (max-width: 700px) {
+  .tb{padding:5px 8px;gap:4px;}
+  .tb-btn{padding:5px 8px;font-size:10px;}
+  .tb-title{font-size:13px;margin-right:4px;}
+  .tb-sep{display:none;} /* hide divider bars on mobile to save horizontal space */
+}
 .tb-title{font-weight:800;font-size:15px;color:#e8b931;margin-right:6px;cursor:pointer;}
 .tb-stat{font-weight:700;font-size:12px;color:#e8b931;}
 .tb-lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;}
@@ -154,7 +161,10 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 <div id="sync-pill" style="position:fixed;bottom:10px;right:12px;z-index:9998;background:#6b7280;color:#fff;padding:4px 11px;border-radius:99px;font-size:11px;font-family:system-ui,-apple-system,sans-serif;letter-spacing:0.2px;box-shadow:0 1px 4px rgba(0,0,0,0.2);">Connecting…</div>
 
 <!-- Teammate-update banner (shown when remote changes arrive) -->
-<div id="update-banner" style="display:none;position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:9997;background:#2563eb;color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);" onclick="location.reload();" title="Click to refresh and load the latest changes">🔄 Updates from a teammate — click to refresh</div>
+<div id="update-banner" style="display:none;position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:9997;background:#2563eb;color:#fff;padding:8px 14px 8px 20px;border-radius:6px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);align-items:center;gap:14px;">
+  <span id="update-banner-text" style="cursor:pointer;" onclick="location.reload();" title="Click to refresh and load the latest changes">🔄 Updates from a teammate — click to refresh</span>
+  <span style="cursor:pointer;font-size:18px;line-height:1;opacity:0.85;padding:2px 6px;" onclick="dismissUpdateBanner()" title="Dismiss">×</span>
+</div>
 
 <!-- Context picker (farm + year) — shown when ctx-pill is clicked -->
 <div id="ctx-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9996;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;" onclick="if(event.target===this)closeCtxPicker()">
@@ -229,6 +239,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div id="map"></div>
   <div id="desel" class="map-btn" style="display:none;top:10px;left:10px;" onclick="deselAll()">✕ Deselect</div>
   <div id="sel-color-pick" class="map-btn" style="display:none;top:10px;left:120px;padding:4px 6px;cursor:pointer;" onclick="cycleSelColor()"><span id="sel-color-swatch" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#EF4444;border:1px solid rgba(255,255,255,.4);vertical-align:middle;"></span> <span style="font-size:10px;vertical-align:middle;">Color</span></div>
+  <div id="sel-badge" class="map-btn" style="display:none;bottom:38px;left:10px;font-size:13px;font-weight:700;background:rgba(20,22,28,0.94);color:#e8b931;border-color:#e8b931;padding:6px 14px;letter-spacing:.3px;"></div>
   <div class="map-btn" style="bottom:10px;left:10px;font-size:9px;font-weight:400;color:#888;border-color:#555;cursor:default;pointer-events:none;">Shift + Drag to box select</div>
 </div>
 
@@ -941,6 +952,7 @@ function renderEventPanel(){
             if(ef.applicator) metaTxt+=' · '+ef.applicator;
             if(ef.vendor) metaTxt+=' · from '+ef.vendor;
             h+='<span style="color:#888;font-size:9px;">'+esc(metaTxt)+'</span>';
+            h+='<button class="tb-btn" onclick="event.stopPropagation();editApplicationModal('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;" title="Edit date / applicator / vendor">✎</button>';
             h+='<button class="tb-btn" onclick="event.stopPropagation();unmarkApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;" title="Undo — revert to planned">↺</button>';
           } else {
             h+='<button class="tb-btn" onclick="event.stopPropagation();markFieldApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#22c55e;border-color:#22c55e;" title="Mark only this field as applied (uses the date + applicator in the Mark Complete form below)">✓</button>';
@@ -998,10 +1010,16 @@ function renderEventPanel(){
   // planned ones, but the label needs to make that obvious.
   let plannedCountInMix=0;
   let plannedSelectedInSub=0;
+  let appliedSelectedInSub=0;
   const activeMix=sub.mixes[activeMixIdx];
   if(activeMix) plannedCountInMix=Object.values(activeMix.fields).filter(ef=>ef.status==='planned').length;
   if(sel.size>0){
-    sel.forEach(id=>{sub.mixes.forEach(mx=>{const ef=mx.fields[id];if(ef&&ef.status==='planned')plannedSelectedInSub++;});});
+    sel.forEach(id=>{sub.mixes.forEach(mx=>{
+      const ef=mx.fields[id];
+      if(!ef) return;
+      if(ef.status==='planned') plannedSelectedInSub++;
+      else if(ef.status==='applied') appliedSelectedInSub++;
+    });});
   }
   const btnLabel = sel.size>0
     ? '✓ Mark '+plannedSelectedInSub+' Selected as Applied'
@@ -1012,6 +1030,14 @@ function renderEventPanel(){
   h+='<div class="fp-row" style="gap:4px;">';
   h+='<button class="tb-btn" onclick="markApplied()" '+(btnDisabled?'disabled':'')+' style="background:'+(btnDisabled?'#374151':'#22c55e')+';color:'+(btnDisabled?'#6b7280':'#111')+';border:none;flex:1;font-size:11px;cursor:'+(btnDisabled?'not-allowed':'pointer')+';" title="'+esc(btnTitle)+'">'+btnLabel+'</button>';
   h+='</div>';
+  // Batch edit button — only shown when at least one selected field is already
+  // applied. Lets the user backfill vendor or fix date/applicator on many at once
+  // without clobbering attributes they want to keep (blank field = unchanged).
+  if(appliedSelectedInSub>0){
+    h+='<div class="fp-row" style="gap:4px;margin-top:4px;">';
+    h+='<button class="tb-btn" onclick="editAppliedSelectedModal()" style="background:#3b82f6;color:#fff;border:none;flex:1;font-size:11px;" title="Edit date / applicator / vendor on the already-applied fields in your selection. Blank fields keep current values.">✎ Edit '+appliedSelectedInSub+' Applied Selected</button>';
+    h+='</div>';
+  }
   h+='<div style="font-size:9px;color:#666;margin-top:2px;">Usage (acres × rate) gets deducted from your inventory when you mark applied.</div>';
   h+='</div>';
 
@@ -1040,6 +1066,9 @@ function getProductHistory(){
   const hist={};
   CATEGORIES.forEach(cat=>{(subcategories[cat]||[]).forEach(sub=>{sub.mixes.forEach(mx=>{
     (mx.products||[]).forEach(p=>{if(p.name)hist[p.name]={rate:p.rate,unit:p.unit||'oz/ac'};});});});});
+  // Also from the mix library — recipes saved directly there should still
+  // surface their chemicals as suggestions.
+  (mixLibrary||[]).forEach(m=>{(m.products||[]).forEach(p=>{if(p.name && !hist[p.name])hist[p.name]={rate:p.rate,unit:p.unit||'oz/ac'};});});
   // Also from purchases
   purchases.forEach(p=>{p.items.forEach(it=>{if(it.product&&!hist[it.product])hist[it.product]={rate:0,unit:it.unit||'gal'};});});
   return hist;
@@ -1217,6 +1246,8 @@ function saveMixToSub(){
   sub.mixes.push({id:mixNid++,name:name,color:color,products:prods,notes:'',fields:{}});
   activeMixIdx=sub.mixes.length-1;
   if(!mixLibrary.find(m=>m.name===name&&m.category===activeCategory)){
+    // Library entries are recipes only — color is per-event so the same
+    // recipe can show in different colors across pills.
     mixLibrary.push({id:mixLibNid++,name:name,category:activeCategory,products:prods});
   }
   closeModal();renderEventPanel();renderPills();draw();renderUI();save();
@@ -1275,6 +1306,153 @@ function unmarkApplied(mixIdx,fid){
   delete ef.vendor;
   removeAutoItemsForEvent(eventKey(activeCategory, sub.id, mx.id, fid));
   restyle();renderUI();renderEventPanel();renderPills();save();
+}
+// Edit a chip's already-applied event (date / applicator / vendor) without
+// having to unmark and re-mark. Useful for backfilling vendors on fert
+// applications recorded before vendor capture existed.
+function editApplicationModal(mixIdx,fid){
+  const sub=getActiveSub();if(!sub)return;
+  const mx=sub.mixes[mixIdx];if(!mx)return;
+  const ef=mx.fields[fid];if(!ef)return;
+  const f=F.find(x=>x.id==fid);if(!f)return;
+  const isFert=activeCategory==='fertilizer';
+  let h='<h3>Edit Application</h3>';
+  h+='<div style="font-size:11px;color:#888;margin-bottom:10px;">'+esc(f.name)+(f.farm?' · '+esc(f.farm):'')+' · Mix: '+esc(mx.name||'(unnamed)')+'</div>';
+  h+='<label>Date Applied</label>';
+  h+='<input type="date" id="ea-date" style="width:100%;" value="'+esc(ef.dateApplied||'')+'">';
+  h+='<label>Applicator</label>';
+  h+='<select id="ea-who" style="width:100%;">';
+  h+='<option value="">— Who —</option>';
+  applicators.forEach(a=>{h+='<option'+(ef.applicator===a?' selected':'')+'>'+esc(a)+'</option>';});
+  // Preserve historical applicator value if it's not in the master list.
+  if(ef.applicator && !applicators.includes(ef.applicator)){
+    h+='<option selected>'+esc(ef.applicator)+'</option>';
+  }
+  h+='</select>';
+  if(isFert){
+    h+='<label>Source (vendor)</label>';
+    h+='<select id="ea-vendor" style="width:100%;">';
+    h+='<option value="">— Vendor —</option>';
+    vendors.forEach(v=>{h+='<option'+(ef.vendor===v?' selected':'')+'>'+esc(v)+'</option>';});
+    if(ef.vendor && !vendors.includes(ef.vendor)){
+      h+='<option selected>'+esc(ef.vendor)+'</option>';
+    }
+    h+='<option value="__new__">+ Add New</option>';
+    h+='</select>';
+  }
+  h+='<div class="modal-actions">';
+  h+='<button class="btn-cancel" onclick="closeModal()">Cancel</button>';
+  h+='<button class="btn-primary" onclick="saveEditedApplication('+mixIdx+','+fid+')">Save</button>';
+  h+='</div>';
+  showModal(h);
+}
+function saveEditedApplication(mixIdx,fid){
+  const sub=getActiveSub();if(!sub)return;
+  const mx=sub.mixes[mixIdx];if(!mx)return;
+  const ef=mx.fields[fid];if(!ef)return;
+  const dt=document.getElementById('ea-date').value;
+  const who=document.getElementById('ea-who').value;
+  const vEl=document.getElementById('ea-vendor');
+  let vendor=vEl?vEl.value:'';
+  if(!dt){alert('Select a date.');return;}
+  if(vendor==='__new__'){
+    const n=prompt('New fertilizer vendor name:');
+    if(!n)return;
+    vendors.push(n);
+    vendor=n;
+  }
+  applyEventFields(ef, {dt, who, vendor});
+  // For fert, sync the linked auto-purchase (creates one if absent, replaces
+  // its items if vendor or date changed).
+  createOrUpdateAutoPurchase(ef, sub, mx, fid, activeCategory);
+  closeModal();
+  restyle();renderUI();renderEventPanel();renderPills();save();
+}
+// Batch edit applied events on map-selected fields. Blank inputs leave current
+// values alone — the user only fills in what they want to bulk-update (e.g. a
+// vendor across an entire spread day). Only touches already-applied fields in
+// the active subcategory.
+function editAppliedSelectedModal(){
+  const sub=getActiveSub();if(!sub)return;
+  const ids=[];
+  sel.forEach(id=>{
+    sub.mixes.forEach(mx=>{
+      const ef=mx.fields[id];
+      if(ef && ef.status==='applied') ids.push(id);
+    });
+  });
+  if(!ids.length){ alert('No applied fields in your selection.'); return; }
+  const isFert=activeCategory==='fertilizer';
+  let h='<h3>Edit '+ids.length+' Applied Field'+(ids.length===1?'':'s')+'</h3>';
+  h+='<div style="font-size:11px;color:#888;margin-bottom:10px;">Leave a row blank to keep its current value. Anything you fill in is applied to all '+ids.length+' selected.</div>';
+  h+='<label>Date Applied <span style="color:#888;font-weight:400;font-size:10px;">(leave blank = unchanged)</span></label>';
+  h+='<input type="date" id="bea-date" style="width:100%;" value="">';
+  h+='<label>Applicator</label>';
+  h+='<select id="bea-who" style="width:100%;">';
+  h+='<option value="__keep__">(unchanged)</option>';
+  applicators.forEach(a=>{h+='<option>'+esc(a)+'</option>';});
+  h+='<option value="__new__">+ Add New</option>';
+  h+='</select>';
+  if(isFert){
+    h+='<label>Source (vendor)</label>';
+    h+='<select id="bea-vendor" style="width:100%;">';
+    h+='<option value="__keep__">(unchanged)</option>';
+    vendors.forEach(v=>{h+='<option>'+esc(v)+'</option>';});
+    h+='<option value="__new__">+ Add New</option>';
+    h+='</select>';
+  }
+  h+='<div class="modal-actions">';
+  h+='<button class="btn-cancel" onclick="closeModal()">Cancel</button>';
+  h+='<button class="btn-primary" onclick="saveBatchEditApplied()">Save</button>';
+  h+='</div>';
+  showModal(h);
+}
+function saveBatchEditApplied(){
+  const sub=getActiveSub();if(!sub)return;
+  const dt=document.getElementById('bea-date').value;            // '' = unchanged
+  let who=document.getElementById('bea-who').value;              // '__keep__' = unchanged
+  const vEl=document.getElementById('bea-vendor');
+  let vendor=vEl ? vEl.value : '__keep__';
+  if(who==='__new__'){
+    const n=prompt('New applicator name:');
+    if(!n)return;
+    applicators.push(n);
+    who=n;
+  }
+  if(vendor==='__new__'){
+    const n=prompt('New fertilizer vendor name:');
+    if(!n)return;
+    vendors.push(n);
+    vendor=n;
+  }
+  let count=0;
+  sel.forEach(id=>{
+    sub.mixes.forEach((mx, mxIdx)=>{
+      const ef=mx.fields[id];
+      if(!ef || ef.status!=='applied') return;
+      let changed=false;
+      if(dt){ ef.dateApplied=dt; changed=true; }
+      if(who && who!=='__keep__'){ ef.applicator=who; changed=true; }
+      if(vendor!=='__keep__'){
+        if(vendor){ ef.vendor=vendor; }
+        else { delete ef.vendor; }
+        changed=true;
+      }
+      if(changed){
+        if(activeCategory==='fertilizer'){
+          createOrUpdateAutoPurchase(ef, sub, mx, id, activeCategory);
+        }
+        count++;
+      }
+    });
+  });
+  closeModal();
+  if(count){
+    sel.clear();editId=null;
+    restyle();renderUI();renderEventPanel();renderPills();save();
+  } else {
+    alert('Nothing changed — no values entered.');
+  }
 }
 // Read date + applicator (and fert vendor) from the Mark Complete form.
 // Returns null if invalid (caller should bail). Handles "+ Add New" inline.
@@ -3481,9 +3659,15 @@ let eventPanelCollapsed=false;
 function toggleMenu(){
   const m=document.getElementById('tb-menu');
   if(m.style.display==='none'){
-    // Position below the menu button
+    // Position the dropdown directly below the Menu button. Aligning by the
+    // button's right edge keeps the menu pinned under the trigger instead of
+    // floating to the corner of the viewport.
     const btn=document.querySelector('[onclick="toggleMenu()"]');
-    if(btn){const r=btn.getBoundingClientRect();m.style.top=(r.bottom+4)+'px';m.style.right='12px';}
+    if(btn){
+      const r=btn.getBoundingClientRect();
+      m.style.top=(r.bottom+4)+'px';
+      m.style.right=Math.max(4, (window.innerWidth-r.right))+'px';
+    }
     m.style.display='block';
     setTimeout(()=>{document.addEventListener('click',hideMenuOnClick,{once:true});},10);
   }else{m.style.display='none';}
@@ -3918,14 +4102,21 @@ function showPrintOverlay(){
   overlay.id='print-overlay';
   overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#000;display:flex;flex-direction:column;';
 
-  // Toolbar
+  // Toolbar — fixed-position arrows so they don't shift between pages.
+  // ◀ button | label (fixed width, centered) | ▶ button. Arrows are always
+  // present even with a single page (just disabled), so the layout doesn't
+  // jump when the page count changes between previews.
+  const multi=pages.length>1;
+  const navDisabled=!multi;
   let tbHTML='<div style="background:#1a1d24;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap;">';
   tbHTML+='<button onclick="closePrintOverlay();" style="padding:8px 14px;border-radius:5px;background:transparent;color:#ccc;border:1px solid #444;font-size:13px;cursor:pointer;font-family:inherit;">✕ Close</button>';
-  if(pages.length>1){
-    tbHTML+='<span style="color:#888;font-size:11px;" id="po-page-label">'+esc(pages[0].label)+'</span>';
-    tbHTML+='<button onclick="poNav(-1);" style="padding:6px 12px;border-radius:5px;background:#333;color:#ccc;border:none;font-size:14px;cursor:pointer;">◀</button>';
-    tbHTML+='<button onclick="poNav(1);" style="padding:6px 12px;border-radius:5px;background:#333;color:#ccc;border:none;font-size:14px;cursor:pointer;">▶</button>';
-  }
+  tbHTML+='<button onclick="poNav(-1);" '+(navDisabled?'disabled':'')+' style="padding:6px 12px;border-radius:5px;background:'+(navDisabled?'#1f242c':'#333')+';color:'+(navDisabled?'#555':'#ccc')+';border:none;font-size:14px;cursor:'+(navDisabled?'default':'pointer')+';">◀</button>';
+  tbHTML+='<span id="po-page-label" style="color:#aaa;font-size:11px;min-width:160px;text-align:center;display:inline-block;font-variant-numeric:tabular-nums;">'+esc(pages[0].label)+(multi?' (1/'+pages.length+')':'')+'</span>';
+  tbHTML+='<button onclick="poNav(1);" '+(navDisabled?'disabled':'')+' style="padding:6px 12px;border-radius:5px;background:'+(navDisabled?'#1f242c':'#333')+';color:'+(navDisabled?'#555':'#ccc')+';border:none;font-size:14px;cursor:'+(navDisabled?'default':'pointer')+';">▶</button>';
+  // Per-preview labels toggle — independent from any global setting; re-renders
+  // the preview when flipped.
+  const initLbl=document.getElementById('chk-labels').checked;
+  tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;margin-left:10px;"><input type="checkbox" id="po-labels" '+(initLbl?'checked':'')+' onchange="poToggleLabels()" style="margin:0;"> Labels</label>';
   tbHTML+='<button onclick="printOverlayPage();" style="padding:8px 14px;border-radius:5px;background:#e8b931;color:#111;border:none;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🖨️ Print / Save PDF</button>';
   tbHTML+='<span style="margin-left:auto;font-size:9px;color:#666;">or screenshot</span>';
   tbHTML+='</div>';
@@ -3963,7 +4154,34 @@ function poNav(dir){
   window._poPage=Math.max(0,Math.min(window._poTotal-1,window._poPage+dir));
   pgs.forEach(p=>{p.style.display=parseInt(p.dataset.idx)===window._poPage?'block':'none';});
   const lbl=document.getElementById('po-page-label');
-  if(lbl)lbl.textContent=(window._poLabels[window._poPage]||'')+' ('+(window._poPage+1)+'/'+window._poTotal+')';
+  if(lbl){
+    const suffix=window._poTotal>1?' ('+(window._poPage+1)+'/'+window._poTotal+')':'';
+    lbl.textContent=(window._poLabels[window._poPage]||'')+suffix;
+  }
+}
+// Re-render the print preview when the user flips the inline Labels checkbox.
+// Preserves the page index across the rebuild so the user stays on the map
+// they were looking at.
+function poToggleLabels(){
+  const cb=document.getElementById('po-labels');
+  if(!cb)return;
+  const wantLabels=cb.checked;
+  const idx=window._poPage||0;
+  // Sync the (now hidden) global checkbox so showPrintOverlay reads the new value.
+  const menuCb=document.getElementById('chk-labels');
+  if(menuCb) menuCb.checked=wantLabels;
+  showPrintOverlay();
+  // showPrintOverlay always starts at page 0 — restore the previous index.
+  if(idx>=0 && idx<(window._poTotal||0) && idx!==0){
+    const pgs=document.querySelectorAll('.po-page');
+    pgs.forEach(p=>{p.style.display=parseInt(p.dataset.idx)===idx?'block':'none';});
+    window._poPage=idx;
+    const lbl=document.getElementById('po-page-label');
+    if(lbl){
+      const suffix=window._poTotal>1?' ('+(idx+1)+'/'+window._poTotal+')':'';
+      lbl.textContent=(window._poLabels[idx]||'')+suffix;
+    }
+  }
 }
 
 function printOverlayPage(){
@@ -3979,13 +4197,16 @@ function printOverlayPage(){
     '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;box-sizing:border-box;}'+
     'html,body{margin:0;padding:0;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;}';
   if(isMapPage){
-    // Map pages: lock to single page, map fills the available space
+    // Map pages: hard-cap to one page. The legend used to spill onto page 2
+    // because flex:1 1 auto on .map-holder asked the SVG to size to its content
+    // first; switching to flex:1 1 0 makes the map fill purely the leftover
+    // space after siblings. Also adds modern break-inside / clip overflow.
     css+='html,body{width:100%;height:100%;overflow:hidden;}'+
-      '.sheet{display:flex;flex-direction:column;width:100%;height:9.9in;max-height:9.9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;}'+
-      '.sheet>*{flex:0 0 auto;}'+
-      '.sheet>.map-holder{flex:1 1 auto;min-height:0;width:100%;}'+
-      '.map-holder svg{width:100%;height:100%;display:block;}'+
-      '@media print{html,body{height:auto;}.sheet{height:9.9in;}}';
+      '.sheet{display:flex;flex-direction:column;width:100%;height:9.9in;max-height:9.9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
+      '.sheet>*{flex-shrink:0;break-inside:avoid;page-break-inside:avoid;}'+
+      '.sheet>.map-holder{flex:1 1 0!important;min-height:0!important;width:100%;overflow:hidden;}'+
+      '.map-holder svg{width:100%;height:100%;max-height:100%;display:block;}'+
+      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.9in;overflow:hidden;}}';
   }else{
     // Recap pages: allow natural flow; avoid page breaks inside table rows
     css+='.sheet{width:100%;}'+
@@ -4105,9 +4326,14 @@ function showAuthError(e){
 
 function showUpdateBanner(byWhom){
   const b = document.getElementById('update-banner');
-  if(!b) return;
-  b.textContent = `🔄 ${byWhom ? byWhom + ' just' : 'A teammate'} made changes — click to refresh`;
-  b.style.display = 'block';
+  const t = document.getElementById('update-banner-text');
+  if(!b || !t) return;
+  t.textContent = `🔄 ${byWhom ? byWhom + ' just' : 'A teammate'} made changes — click to refresh`;
+  b.style.display = 'flex';
+}
+function dismissUpdateBanner(){
+  const b = document.getElementById('update-banner');
+  if(b) b.style.display = 'none';
 }
 
 function __getAuthFormCreds(){
@@ -4313,12 +4539,15 @@ async function enterFarm(farmId){
   updateCtxPill();
 
   // Real-time listener: alert when a teammate updates this year's doc.
+  // Skip our own writes (clientId match) AND writes from our own email on
+  // another device — multi-device single-user shouldn't pester themselves.
   __snapshotUnsub = onSnapshot(yref, (snap) => {
     if(!__bootDone) return;
     if(!snap.exists()) return;
     if(snap.metadata.hasPendingWrites) return;
     const data = snap.data();
     if(data.clientId === __clientId) return;
+    if(__fbUser && data.editedBy && data.editedBy === __fbUser.email) return;
     showUpdateBanner(data.editedBy);
   }, (err) => console.error('Snapshot error:', err));
 }
