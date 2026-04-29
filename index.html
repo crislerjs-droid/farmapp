@@ -185,49 +185,82 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <span class="tb-stat" id="s-fields">0</span><span class="tb-lbl">fields</span>
   <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
   <div class="tb-sep"></div>
-  <span class="tb-lbl">View:</span>
-  <button class="tb-btn" id="btn-crop" onclick="viewCrop()">Crop Map</button>
-  <button class="tb-btn" id="btn-var" onclick="viewVarietyPick()">Variety ▾</button>
-  <select class="tb-sel" id="var-pick" style="display:none;" onchange="viewVariety(this.value)"></select>
-  <button class="tb-btn" id="btn-trait" onclick="viewTraitPick()" title="Herbicide trait map — colors fields by what chemistry they tolerate (e.g. FullPage vs Conventional rice)">Trait ▾</button>
-  <select class="tb-sel" id="trait-pick" style="display:none;" onchange="viewTrait(this.value)"></select>
-  <button class="tb-btn" id="btn-trait-edit" onclick="showPanel('pan-traits')" title="Edit which trait each variety has">⚙</button>
-  <button class="tb-btn" id="btn-clear" onclick="viewClear()">Clear</button>
+  <button class="tb-btn" onclick="toggleViewMenu()" title="Pick a map coloring view (crop / variety / trait)">Map ▾</button>
   <div class="tb-sep"></div>
-  <!-- Category buttons -->
+  <button class="tb-btn" onclick="showPanel('pan-edit')" title="Plant your fields — set crop, variety, and plant date">Planting</button>
   <button class="tb-btn" id="btn-spray" onclick="viewCategory('spray')">Spray</button>
   <button class="tb-btn" id="btn-fertilizer" onclick="viewCategory('fertilizer')">Fertilizer</button>
+  <button class="tb-btn" onclick="viewClear()" title="Clear the current map view">Clear</button>
   <div class="tb-sep"></div>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" onclick="doPDF()">📄 PDF</button>
-  <button class="tb-btn" onclick="showPanel('pan-edit')">✏️ Edit</button>
-  <button class="tb-btn" onclick="showPanel('pan-inventory')">📦 Inventory</button>
+  <button class="tb-btn" onclick="doPDF()" title="Generate a printable map PDF">PDF</button>
   <button class="tb-btn" onclick="toggleMenu()">☰ Menu</button>
+  <!-- Hidden legacy buttons — kept in DOM so existing view functions can still
+       getElementById and toggle their .on class without crashing. -->
+  <span style="display:none;">
+    <button class="tb-btn" id="btn-crop" onclick="viewCrop()">Crop Map</button>
+    <button class="tb-btn" id="btn-var" onclick="viewVarietyPick()">Variety ▾</button>
+    <button class="tb-btn" id="btn-trait" onclick="viewTraitPick()">Trait ▾</button>
+    <button class="tb-btn" id="btn-trait-edit" onclick="showPanel('pan-traits')">⚙</button>
+    <button class="tb-btn" id="btn-clear" onclick="viewClear()">Clear</button>
+  </span>
+</div>
+
+<!-- Map dropdown — Crop Map / Variety / Trait. Clear is on the main toolbar. -->
+<div id="view-menu" style="display:none;position:fixed;top:auto;z-index:10001;background:rgba(20,22,28,.97);border:1px solid #444;border-radius:6px;padding:6px 0;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:230px;">
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="viewCrop();hideViewMenu();">Crop Map</div>
+  <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;">Variety</div>
+  <div style="padding:2px 14px 6px;">
+    <select class="tb-sel" id="var-pick" style="width:100%;font-size:11px;" onchange="if(this.value){viewVariety(this.value);hideViewMenu();}"></select>
+  </div>
+  <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center;">
+    <span>Trait</span>
+    <button class="tb-btn" onclick="showPanel('pan-traits');hideViewMenu();" style="padding:1px 8px;font-size:9px;" title="Edit which trait each variety has">Edit</button>
+  </div>
+  <div style="padding:2px 14px 6px;">
+    <select class="tb-sel" id="trait-pick" style="width:100%;font-size:11px;" onchange="if(this.value){viewTrait(this.value);hideViewMenu();}"></select>
+  </div>
+  <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center;">
+    <span>Program</span>
+    <button class="tb-btn" onclick="showPanel('pan-programs');hideViewMenu();" style="padding:1px 8px;font-size:9px;" title="Add / edit growing programs and assign fields">Edit</button>
+  </div>
+  <div style="padding:2px 14px 6px;">
+    <select class="tb-sel" id="program-pick" style="width:100%;font-size:11px;" onchange="if(this.value){viewProgram(this.value);hideViewMenu();}"></select>
+  </div>
 </div>
 
 <!-- Dropdown menu -->
-<div id="tb-menu" style="display:none;position:fixed;top:auto;right:12px;z-index:10001;background:rgba(20,22,28,.97);border:1px solid #444;border-radius:6px;padding:6px 0;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:180px;">
+<div id="tb-menu" style="display:none;position:fixed;top:auto;right:12px;z-index:10001;background:rgba(20,22,28,.97);border:1px solid #444;border-radius:6px;padding:6px 0;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:200px;max-height:calc(100vh - 60px);overflow-y:auto;">
+  <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">View / Print</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="doPDF();hideMenu();">📄 PDF</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="doPrint();hideMenu();">🖨️ Print</div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;">
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="chk-labels" checked onchange="draw()" style="margin:0;"> Labels</label>
-  </div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;">
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="showPanel('pan-inventory');hideMenu();">📦 Inventory</div>
+  <div style="padding:4px 14px;font-size:11px;color:#ccc;">
     <select class="tb-sel" id="chk-orient" style="font-size:10px;padding:3px 4px;width:100%;">
       <option value="portrait">Portrait</option>
       <option value="landscape">Landscape</option>
     </select>
   </div>
-  <div style="height:1px;background:#333;margin:4px 0;"></div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlGeoJSON();hideMenu();">📦 Export GeoJSON</div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlCSV();hideMenu();">📊 Export CSV</div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlKML();hideMenu();">🌍 Export KML</div>
-  <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <!-- Hidden: live-map / preview-default label toggle. Controlled inline from
+       the print preview now; kept in DOM so existing references still work. -->
+  <input type="checkbox" id="chk-labels" checked style="display:none;">
+  <div style="height:1px;background:#333;margin:6px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">Data</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="saveFile();hideMenu();">💾 Save Data</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="loadFile();hideMenu();">📥 Load Data</div>
-  <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <div style="height:1px;background:#333;margin:6px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">Export</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlGeoJSON();hideMenu();">📦 GeoJSON</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlCSV();hideMenu();">📊 CSV</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlKML();hideMenu();">🌍 KML</div>
+  <div style="height:1px;background:#333;margin:6px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">Cloud</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudSave();hideMenu();" title="Force an immediate cloud sync (auto-sync also runs after each change)">☁️ Force Sync Now</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudLoad();hideMenu();" title="Discard local changes and pull the latest from cloud">⬇️ Pull from Cloud</div>
-  <div style="height:1px;background:#333;margin:4px 0;"></div>
+  <div style="height:1px;background:#333;margin:6px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">Account</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="fbSignOut();hideMenu();">🚪 Sign Out</div>
   <div style="padding:6px 14px;font-size:11px;color:#ef4444;cursor:pointer;" onclick="resetData();hideMenu();">🗑️ Reset All</div>
 </div>
@@ -259,6 +292,10 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div class="fp-row" style="margin-top:4px;">
     <span class="tb-lbl" style="min-width:65px;">Planted:</span>
     <input type="date" class="tb-input" id="ed-plantdate" style="flex:1;" onchange="edSavePlantDate()">
+  </div>
+  <div class="fp-row" style="margin-top:4px;">
+    <span class="tb-lbl" style="min-width:65px;">Program:</span>
+    <select class="tb-sel" id="ed-program" style="flex:1;" onchange="edSaveProgram()" title="Growing program enrollment for this field"></select>
   </div>
   <div style="border-top:1px solid #333;margin-top:8px;padding-top:8px;">
     <div class="fp-title">Batch — <span id="bat-n">0</span> fields selected</div>
@@ -311,6 +348,11 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
     Set the herbicide-tolerance trait for each variety. This drives the Trait map that tells pilots and applicators what chemistry is safe. Guessed values are prefilled — correct any that are wrong.
   </div>
   <div id="traits-content"></div>
+</div>
+
+<div id="pan-programs" class="fpanel" style="width:380px;">
+  <button class="fp-close" onclick="hidePanel('pan-programs')">✕</button>
+  <div id="programs-content"></div>
 </div>
 
 <!-- Bottom legend -->
@@ -528,10 +570,233 @@ function resetTraitColor(crop,code){
   renderUI();
 }
 
+// === PROGRAMS ===
+// User-defined growing programs per crop, stored on the global `programs`
+// object as { Rice: [{name, color}, ...] }. Each field carries f.program (the
+// program name) when enrolled. The panel UI mirrors the Spray/Fertilizer
+// event panel: crop dropdown at top, program "cards" below, an active card
+// highlighted, and a yellow "Assign Selected Fields →" button at the bottom.
+let programPanelCrop=''; // crop selected in the panel header dropdown
+let activeProgramIdx=0;  // which program card is the assign target
+const __progExpanded=new Set(); // collapsible field-chip lists per (crop,name)
+
+function renderProgramPanel(){
+  const wrap=document.getElementById('programs-content');if(!wrap)return;
+  const cropsFromFields=[...new Set(F.map(f=>f.crop).filter(Boolean))];
+  const cropsWithPrograms=Object.keys(programs).filter(c=>(programs[c]||[]).length);
+  const cropsAll=[...new Set([...cropsFromFields,...cropsWithPrograms])].sort();
+  if(!cropsAll.length){
+    wrap.innerHTML='<div style="padding:12px;color:#888;font-size:11px;">Plant fields first — programs are configured per crop.</div>';
+    return;
+  }
+  // Default the panel crop to whatever's already active (programCrop) or first available.
+  if(!programPanelCrop || !cropsAll.includes(programPanelCrop)){
+    programPanelCrop = cropsAll.includes(programCrop) ? programCrop : cropsAll[0];
+  }
+  // Auto-switch the live map to colour by program for this crop so the user
+  // sees enrollment as they assign.
+  if(mode!=='program' || programCrop!==programPanelCrop){
+    programCrop=programPanelCrop;mode='program';
+    varCrop='';traitCrop='';activeCategory=null;activeSubId=null;
+    draw();renderUI();
+  }
+  const list=programs[programPanelCrop]||[];
+  if(activeProgramIdx>=list.length) activeProgramIdx=Math.max(0,list.length-1);
+
+  // How many selected fields match the panel crop (used for assign/unenroll labels).
+  let selMatchingCrop=0;
+  if(sel.size>0){sel.forEach(id=>{const f=F.find(x=>x.id===id);if(f&&f.crop===programPanelCrop)selMatchingCrop++;});}
+
+  let h='';
+  // Header: title + crop selector
+  h+='<div class="fp-title">Programs</div>';
+  h+='<div class="fp-row"><span class="tb-lbl" style="min-width:55px;">Crop:</span>';
+  h+='<select class="tb-sel" id="prog-crop-sel" style="flex:1;" onchange="setProgramPanelCrop(this.value)">';
+  cropsAll.forEach(c=>{h+='<option value="'+esc(c)+'"'+(c===programPanelCrop?' selected':'')+'>'+esc(c)+'</option>';});
+  h+='</select></div>';
+
+  // Program cards
+  h+='<div style="margin-top:8px;">';
+  if(!list.length){
+    h+='<div style="font-size:11px;color:#888;text-align:center;padding:14px;">No '+esc(programPanelCrop)+' programs yet — add one below.</div>';
+  }
+  list.forEach((p,i)=>{
+    const enrolled=F.filter(f=>f.crop===programPanelCrop&&f.program===p.name);
+    const ac=enrolled.reduce((s,f)=>s+f.acres,0);
+    const isActive=i===activeProgramIdx;
+    h+='<div style="border:1px solid '+(isActive?p.color:'#444')+';border-radius:6px;padding:8px;margin-bottom:6px;'
+      +(isActive?'background:rgba(255,255,255,.04);':'')+'cursor:pointer;" onclick="activeProgramIdx='+i+';renderProgramPanel();">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+    h+='<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">';
+    h+='<span style="width:14px;height:14px;border-radius:3px;background:'+p.color+';display:inline-block;border:1px solid rgba(255,255,255,.2);flex-shrink:0;"></span>';
+    h+='<input class="tb-input" value="'+esc(p.name)+'" style="flex:1;font-weight:700;min-width:0;" onchange="renameProgram(\''+esc(programPanelCrop)+'\','+i+',this.value)" onclick="event.stopPropagation();">';
+    h+='</div>';
+    h+='<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">';
+    h+='<span style="font-size:10px;color:'+p.color+';font-weight:700;white-space:nowrap;">'+ac.toFixed(0)+' ac · '+enrolled.length+' fld</span>';
+    h+='<button class="tb-btn" onclick="event.stopPropagation();removeProgram(\''+esc(programPanelCrop)+'\','+i+');" style="padding:1px 6px;font-size:9px;color:#ef4444;border-color:#ef4444;">✕</button>';
+    h+='</div></div>';
+    // Color palette
+    h+='<div style="display:flex;gap:3px;flex-wrap:wrap;padding-left:20px;margin-top:3px;" onclick="event.stopPropagation();">';
+    TRAIT_PALETTE.forEach(c=>{
+      const isCol=c.toLowerCase()===(p.color||'').toLowerCase();
+      const size=isCol?'16px':'14px';
+      const border=isCol?'2px solid #e8b931':'1px solid #444';
+      h+='<span role="button" title="'+c+'" onclick="setProgramColor(\''+esc(programPanelCrop)+'\','+i+',\''+c+'\')" style="display:inline-block;width:'+size+';height:'+size+';border-radius:3px;background:'+c+';border:'+border+';cursor:pointer;flex-shrink:0;box-sizing:border-box;"></span>';
+    });
+    h+='</div>';
+    // Field chips (collapsible like spray)
+    if(enrolled.length){
+      const expandKey=programPanelCrop+'|'+p.name;
+      const expanded=__progExpanded.has(expandKey);
+      h+='<div style="padding:4px 0 0 20px;font-size:10px;color:#aaa;" onclick="event.stopPropagation();">';
+      h+='<span style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation();toggleProgFields(\''+esc(expandKey)+'\');">';
+      h+='<span style="display:inline-block;width:12px;text-align:center;color:#888;font-weight:700;font-size:12px;">'+(expanded?'−':'+')+'</span>';
+      h+='<span>Fields ('+enrolled.length+')</span>';
+      h+='</span>';
+      if(expanded){
+        h+='<div style="margin-top:3px;">';
+        enrolled.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(f=>{
+          h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#262626;padding:2px 4px 2px 6px;border-radius:3px;border-left:3px solid '+p.color+';margin:1px 2px 1px 0;font-size:10px;vertical-align:middle;">';
+          h+='<span style="color:#ddd;">'+esc(f.name)+'</span>';
+          h+='<button class="tb-btn" onclick="event.stopPropagation();unenrollFieldFromProgram('+f.id+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#ef4444;border-color:#ef4444;" title="Remove this field from '+esc(p.name)+'">✕</button>';
+          h+='</span>';
+        });
+        h+='</div>';
+      }
+      h+='</div>';
+    }
+    h+='</div>';
+  });
+  h+='</div>';
+
+  // Add program
+  h+='<button class="tb-btn" onclick="addProgram(\''+esc(programPanelCrop)+'\')" style="margin-top:4px;width:100%;border-style:dashed;">+ Add '+esc(programPanelCrop)+' Program</button>';
+
+  // Assign / Unenroll controls (mirrors Spray's "Assign Selected Fields →")
+  h+='<div style="border-top:1px solid #333;margin-top:10px;padding-top:8px;">';
+  const haveActive=list.length>0;
+  const canAssign=haveActive && selMatchingCrop>0;
+  const activeName=haveActive?list[activeProgramIdx].name:'(no program)';
+  h+='<div class="fp-row">';
+  h+='<button class="tb-btn" onclick="assignSelectedToActiveProgram()" '+(canAssign?'':'disabled')+' style="background:'+(canAssign?'#e8b931':'#374151')+';color:'+(canAssign?'#111':'#6b7280')+';border:none;flex:1;cursor:'+(canAssign?'pointer':'not-allowed')+';" title="Enroll selected '+esc(programPanelCrop)+' fields into '+esc(activeName)+'">Assign '+selMatchingCrop+' Selected → '+esc(activeName)+'</button>';
+  h+='</div>';
+  if(selMatchingCrop>0){
+    h+='<div class="fp-row">';
+    h+='<button class="tb-btn" onclick="clearProgramOnSelected()" style="font-size:9px;flex:1;">Unenroll '+selMatchingCrop+' Selected</button>';
+    h+='</div>';
+  }
+  h+='<div style="font-size:9px;color:#666;margin-top:2px;">Pick a program above (it gets a colored border), select fields on the map, then tap Assign.</div>';
+  h+='</div>';
+  wrap.innerHTML=h;
+}
+
+function setProgramPanelCrop(crop){
+  programPanelCrop=crop;
+  activeProgramIdx=0;
+  renderProgramPanel(); // also auto-switches the map to mode=program for this crop
+}
+
+function toggleProgFields(key){
+  if(__progExpanded.has(key))__progExpanded.delete(key);
+  else __progExpanded.add(key);
+  renderProgramPanel();
+}
+
+function _nextProgramColor(crop){
+  const used=new Set((programs[crop]||[]).map(p=>(p.color||'').toLowerCase()));
+  for(const c of TRAIT_PALETTE){if(!used.has(c.toLowerCase()))return c;}
+  return TRAIT_PALETTE[(programs[crop]||[]).length%TRAIT_PALETTE.length];
+}
+function addProgram(crop){
+  const name=prompt('Name for the new '+crop+' program:');
+  if(!name||!name.trim())return;
+  const trimmed=name.trim();
+  if(!programs[crop])programs[crop]=[];
+  if(programs[crop].some(p=>p.name===trimmed)){alert('A program with that name already exists.');return;}
+  programs[crop].push({name:trimmed,color:_nextProgramColor(crop)});
+  activeProgramIdx=programs[crop].length-1; // newly-added becomes active
+  save();
+  renderProgramPanel();
+  draw();renderUI();
+}
+function renameProgram(crop,idx,newName){
+  newName=(newName||'').trim();
+  if(!newName)return;
+  const list=programs[crop]||[];
+  const p=list[idx];if(!p)return;
+  if(list.some((q,i)=>i!==idx&&q.name===newName)){alert('Name already in use.');renderProgramPanel();return;}
+  const oldName=p.name;
+  p.name=newName;
+  F.forEach(f=>{if(f.crop===crop&&f.program===oldName)f.program=newName;});
+  save();
+  renderProgramPanel();
+  draw();renderUI();
+}
+function setProgramColor(crop,idx,color){
+  const p=(programs[crop]||[])[idx];if(!p)return;
+  p.color=color;
+  save();
+  renderProgramPanel();
+  draw();renderUI();
+}
+// Spray-style: enroll all selected fields (matching the panel crop) into the
+// active program. Mirrors assignSelected() in the spray panel.
+function assignSelectedToActiveProgram(){
+  const crop=programPanelCrop;
+  const list=programs[crop]||[];
+  const p=list[activeProgramIdx];
+  if(!p){alert('Pick a program first (or add one).');return;}
+  if(!sel.size){alert('Select '+crop+' fields on the map first.');return;}
+  let n=0;
+  sel.forEach(id=>{const f=F.find(x=>x.id===id);if(f&&f.crop===crop){f.program=p.name;n++;}});
+  if(!n){alert('No selected fields are '+crop+' fields.');return;}
+  sel.clear();editId=null;
+  save();
+  renderProgramPanel();
+  restyle();renderUI();
+}
+function clearProgramOnSelected(){
+  const crop=programPanelCrop;
+  if(!sel.size)return;
+  let n=0;
+  sel.forEach(id=>{const f=F.find(x=>x.id===id);if(f&&f.crop===crop){f.program='';n++;}});
+  if(!n)return;
+  sel.clear();editId=null;
+  save();
+  renderProgramPanel();
+  restyle();renderUI();
+}
+function unenrollFieldFromProgram(fid){
+  const f=F.find(x=>x.id===fid);if(!f)return;
+  f.program='';
+  save();
+  renderProgramPanel();
+  restyle();renderUI();
+}
+function removeProgram(crop,idx){
+  const list=programs[crop]||[];
+  const p=list[idx];if(!p)return;
+  const enrolled=F.filter(f=>f.crop===crop&&f.program===p.name).length;
+  const msg=enrolled>0
+    ? 'Remove "'+p.name+'"? '+enrolled+' field'+(enrolled===1?'':'s')+' will be unenrolled.'
+    : 'Remove "'+p.name+'"?';
+  if(!confirm(msg))return;
+  list.splice(idx,1);
+  F.forEach(f=>{if(f.crop===crop&&f.program===p.name)f.program='';});
+  if(activeProgramIdx>=list.length) activeProgramIdx=Math.max(0,list.length-1);
+  save();
+  renderProgramPanel();
+  draw();renderUI();
+}
+
 // === STATE ===
 let F=[],map,layers={},fieldLabelLayer=null,nid=1,editId=null,curPanel=null,fFarm="";
 let sel=new Set();
-let mode='none',varCrop='',traitCrop='';
+let mode='none',varCrop='',traitCrop='',programCrop='';
+// Growing programs are user-defined per-crop lists: { Rice: [{name, color}, ...] }.
+// A field's enrollment is on f.program (string, the program name). Crops without
+// an entry here have no programs configured yet.
+let programs={};
 
 const CATEGORIES=['spray','fertilizer'];
 const CAT_LABELS={spray:'Spray',fertilizer:'Fertilizer'};
@@ -555,6 +820,28 @@ let subNid=1,mixNid=1;
 let activeCategory=null;
 let activeSubId=null;  // active subcategory (pill)
 let activeMixIdx=0;    // active mix index within subcategory
+let activeCropFilter=null;  // when in spray/fert mode, which crop's events are showing
+// Subcategories are scoped to a crop now. Older saves predate that field, so
+// infer their crop from the fields they touch — most common crop among any
+// mix's enrolled fields wins. Subcategories with no enrollments stay empty
+// (the user can edit them to assign a crop).
+function migrateSubcategoryCrops(){
+  Object.values(subcategories || {}).forEach(catSubs => {
+    (catSubs||[]).forEach(sub => {
+      if(sub.crop !== undefined) return;
+      const counts = {};
+      (sub.mixes||[]).forEach(mx => {
+        Object.keys(mx.fields||{}).forEach(fid => {
+          const f = F.find(x => x.id == fid);
+          if(f && f.crop && f.crop !== 'Fallow') counts[f.crop] = (counts[f.crop]||0)+1;
+        });
+      });
+      let best = '', max = 0;
+      for(const c in counts){ if(counts[c] > max){ max = counts[c]; best = c; } }
+      sub.crop = best;
+    });
+  });
+}
 
 // Vendors & Applicators
 let vendors=['Helena','Nutrien','Simplot','FSA','Stokes'];
@@ -628,7 +915,9 @@ function initMap(){
       let cx=0,cy=0;f.points.forEach(p=>{cx+=p[0];cy+=p[1];});cx/=f.points.length;cy/=f.points.length;
       if(bounds.contains(L.latLng(cx,cy))){sel.add(f.id);count++;}
     });
-    if(count>0){restyle();renderUI();renderEventPanel();}
+    if(count>0){restyle();renderUI();renderEventPanel();
+      if(document.getElementById('pan-programs').classList.contains('show'))renderProgramPanel();
+    }
   });
   mapEl.addEventListener('contextmenu',function(e){if(e.shiftKey)e.preventDefault();});
 }
@@ -659,6 +948,13 @@ function fc(f){
   if(mode==='crop')return CC[f.crop]||AC[f.id%12];
   if(mode==='variety'){if(f.crop===varCrop)return VC[f.variety]||AC[f.id%12];return'transparent';}
   if(mode==='trait'){if(f.crop===traitCrop){const t=traitFor(f.crop,f.variety);return t?t.color:'#9E9E9E';}return'transparent';}
+  if(mode==='program'){
+    if(f.crop===programCrop){
+      const p=(programs[f.crop]||[]).find(p=>p.name===f.program);
+      return p?p.color:'#9E9E9E'; // gray for fields not enrolled in any program
+    }
+    return'transparent';
+  }
   return'transparent';
 }
 // Fill opacity
@@ -675,22 +971,26 @@ function fo(f){
   if(mode==='none')return 0;if(mode==='crop')return 0.55;
   if(mode==='variety')return f.crop===varCrop?0.55:0;
   if(mode==='trait')return f.crop===traitCrop?0.65:0;
+  if(mode==='program')return f.crop===programCrop?0.55:0;
   return 0;
 }
-// Border color: selection highlight > mix color for assigned fields > default
+// Border color: black for any selected field (so it pops against any fill,
+// whether crop/variety/trait/program/mix), then mix color for assigned fields,
+// then default white. The selColor is still used for the *fill* of selected
+// fields — only the border is forced black for visibility.
 function fb(f){
-  if(sel.has(f.id))return selColor;
+  if(sel.has(f.id)) return '#000';
   const sub=getActiveSub();
   if(sub){
     for(const mx of sub.mixes){
       if(mx.fields[f.id])return mx.color;
     }
   }
-  return'rgba(255,255,255,.5)';
+  return'rgba(255,255,255,.85)';
 }
 // Border weight: selected > planned (thick colored border) > default
 function fw(f){
-  if(sel.has(f.id))return 3;
+  if(sel.has(f.id))return 2;
   const sub=getActiveSub();
   if(sub){
     for(const mx of sub.mixes){
@@ -700,12 +1000,13 @@ function fw(f){
   }
   if(mode==='variety'&&f.crop!==varCrop)return 0.5;
   if(mode==='trait'&&f.crop!==traitCrop)return 0.5;
+  if(mode==='program'&&f.crop!==programCrop)return 0.5;
   return 1.2;
 }
 
 function draw(){
   Object.values(layers).forEach(l=>map.removeLayer(l));layers={};
-  const todo=(mode==='variety'||mode==='trait')?F:filtered();
+  const todo=(mode==='variety'||mode==='trait'||mode==='program')?F:filtered();
   todo.forEach(f=>{
     const ll=f.points.map(p=>[p[0],p[1]]);if(ll.length<3)return;
     const poly=L.polygon(ll,{color:fb(f),weight:fw(f),fillColor:fc(f),fillOpacity:fo(f),opacity:.9}).addTo(map);
@@ -772,8 +1073,11 @@ function toggleSel(id){
   if(sel.has(id)){sel.delete(id);if(editId===id)editId=null;}
   else{sel.add(id);editId=id;if(mode==='variety'||mode==='crop')showEdit(id);}
   restyle();renderUI();renderEventPanel();
+  if(document.getElementById('pan-programs').classList.contains('show'))renderProgramPanel();
 }
-function deselAll(){sel.clear();editId=null;restyle();renderUI();renderEventPanel();hidePanel('pan-edit');}
+function deselAll(){sel.clear();editId=null;restyle();renderUI();renderEventPanel();
+  if(document.getElementById('pan-programs').classList.contains('show'))renderProgramPanel();
+  hidePanel('pan-edit');}
 const SEL_COLORS=['#EF4444','#3B82F6','#F59E0B','#8B5CF6','#10B981','#EC4899','#06B6D4','#F97316','#e8b931'];
 function cycleSelColor(){
   const idx=SEL_COLORS.indexOf(selColor);
@@ -785,14 +1089,14 @@ function doFilter(){const el=document.getElementById('f-farm');fFarm=el?el.value
 
 // === VIEW MODES ===
 function goHome(){activeCategory=null;activeSubId=null;activeMixIdx=0;viewClear();}
-function viewClear(){mode='none';varCrop='';traitCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;
+function viewClear(){mode='none';varCrop='';traitCrop='';programCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;activeCropFilter=null;
   document.getElementById('var-pick').style.display='none';
   document.getElementById('trait-pick').style.display='none';
   document.getElementById('btn-var').textContent='Variety ▾';
   document.getElementById('btn-trait').textContent='Trait ▾';
   clearCatButtons();document.getElementById('btn-clear').classList.add('on');
   hidePanel('pan-event');renderPills();draw();renderUI();}
-function viewCrop(){mode='crop';varCrop='';traitCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;
+function viewCrop(){mode='crop';varCrop='';traitCrop='';programCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;
   document.getElementById('var-pick').style.display='none';
   document.getElementById('trait-pick').style.display='none';
   document.getElementById('btn-var').textContent='Variety ▾';
@@ -807,7 +1111,7 @@ function viewVarietyPick(){
   pk.style.display='inline-block';pk.focus();
 }
 function viewVariety(crop){
-  if(!crop)return;varCrop=crop;traitCrop='';mode='variety';activeCategory=null;activeSubId=null;activeMixIdx=0;
+  if(!crop)return;varCrop=crop;traitCrop='';programCrop='';mode='variety';activeCategory=null;activeSubId=null;activeMixIdx=0;
   document.getElementById('var-pick').style.display='none';
   document.getElementById('trait-pick').style.display='none';
   document.getElementById('btn-trait').textContent='Trait ▾';
@@ -826,7 +1130,7 @@ function viewTraitPick(){
   pk.style.display='inline-block';pk.focus();
 }
 function viewTrait(crop){
-  if(!crop)return;traitCrop=crop;varCrop='';mode='trait';activeCategory=null;activeSubId=null;activeMixIdx=0;
+  if(!crop)return;traitCrop=crop;varCrop='';programCrop='';mode='trait';activeCategory=null;activeSubId=null;activeMixIdx=0;
   document.getElementById('trait-pick').style.display='none';
   document.getElementById('var-pick').style.display='none';
   document.getElementById('btn-var').textContent='Variety ▾';
@@ -834,19 +1138,30 @@ function viewTrait(crop){
   document.getElementById('btn-trait').textContent=crop+' Traits ▾';
   hidePanel('pan-event');renderPills();draw();renderUI();
 }
+// Program view: colors fields by which growing program they're enrolled in
+// for the selected crop. Programs are user-defined per crop.
+function viewProgram(crop){
+  if(!crop)return;programCrop=crop;varCrop='';traitCrop='';mode='program';activeCategory=null;activeSubId=null;activeMixIdx=0;
+  hidePanel('pan-event');renderPills();draw();renderUI();
+}
 function clearCatButtons(){document.querySelectorAll('.tb-btn').forEach(b=>b.classList.remove('on'));}
 
 function viewCategory(cat){
   mode='event';activeCategory=cat;activeSubId=null;activeMixIdx=0;
+  // Reset to crop-picker view: user picks a crop first, then drills into events.
+  activeCropFilter=null;
   document.getElementById('var-pick').style.display='none';
   clearCatButtons();
   const btn=document.getElementById('btn-'+cat);if(btn)btn.classList.add('on');
-  const subs=subcategories[cat]||[];
-  if(subs.length>0){selectSub(subs[0].id);}
-  else{renderPills();draw();renderUI();showPanel('pan-event');renderEventPanel();}
+  hidePanel('pan-event');
+  renderPills();draw();renderUI();
 }
 function selectSub(subId){
   activeSubId=subId;activeMixIdx=0;
+  // Lock the crop filter to the chosen sub's crop so the pill row stays in sync.
+  const subs=subcategories[activeCategory]||[];
+  const sub=subs.find(s=>s.id===subId);
+  if(sub && sub.crop) activeCropFilter=sub.crop;
   renderPills();draw();renderUI();
   showPanel('pan-event');expandEventPanel();renderEventPanel();
 }
@@ -855,20 +1170,51 @@ function selectSub(subId){
 function renderPills(){
   const cont=document.getElementById('sub-pills');
   if(!activeCategory){cont.innerHTML='';return;}
-  const subs=subcategories[activeCategory]||[];
+  // Active crops in F (excluding Fallow). Includes any crops referenced by
+  // existing subcategories so the user can still see legacy events even if
+  // they've removed all of that crop's fields.
+  const cropsFromFields=new Set(F.map(f=>f.crop).filter(c=>c && c !== 'Fallow'));
+  const cropsFromSubs=new Set((subcategories[activeCategory]||[]).map(s=>s.crop).filter(Boolean));
+  const cropsAll=[...new Set([...cropsFromFields,...cropsFromSubs])].sort();
   let h='';
-  subs.forEach(sub=>{
-    let totalFields=0,totalApplied=0;
-    sub.mixes.forEach(mx=>{const fids=Object.keys(mx.fields);totalFields+=fids.length;totalApplied+=fids.filter(id=>mx.fields[id].status==='applied').length;});
-    const statusColor=totalFields===0?'#666':totalApplied===totalFields?'#22c55e':totalApplied>0?'#f59e0b':'#3b82f6';
-    h+='<button class="pill'+(activeSubId===sub.id?' active':'')+'" onclick="selectSub('+sub.id+')">';
-    h+='<span class="pill-status" style="background:'+statusColor+';"></span>';
-    h+=esc(sub.name);
-    if(totalFields>0)h+=' <span style="opacity:.6;font-size:9px;">('+totalApplied+'/'+totalFields+')</span>';
-    h+='</button>';
-  });
-  h+='<button class="pill add-pill" onclick="createSubModal()">+ New</button>';
+  // Row 1: crop pills. Click to drill into that crop's events.
+  h+='<div style="display:flex;gap:4px;flex-wrap:wrap;width:100%;align-items:center;">';
+  if(cropsAll.length===0){
+    h+='<span style="font-size:10px;color:#888;padding:4px 8px;">No active crops yet — plant some fields first.</span>';
+  } else {
+    cropsAll.forEach(c=>{
+      const isActive=activeCropFilter===c;
+      h+='<button class="pill'+(isActive?' active':'')+'" onclick="selectCropFilter(\''+esc(c)+'\')">'+esc(c)+'</button>';
+    });
+  }
+  // Mix Library pill — opens a manager for cross-crop mix recipes. Visually
+  // distinct from crop pills so it doesn't get mistaken for a crop filter.
+  h+='<button class="pill" onclick="showMixLibrary()" style="background:rgba(232,185,49,0.08);border-color:#e8b931;color:#e8b931;" title="Manage saved mix recipes that span any crop">Mix Library</button>';
+  h+='</div>';
+  // Row 2: subcategory pills filtered to the selected crop
+  if(activeCropFilter){
+    const subs=(subcategories[activeCategory]||[]).filter(s=>s.crop===activeCropFilter);
+    h+='<div style="display:flex;gap:4px;flex-wrap:wrap;width:100%;margin-top:3px;border-top:1px dashed #2a2d34;padding-top:3px;">';
+    subs.forEach(sub=>{
+      let totalFields=0,totalApplied=0;
+      sub.mixes.forEach(mx=>{const fids=Object.keys(mx.fields);totalFields+=fids.length;totalApplied+=fids.filter(id=>mx.fields[id].status==='applied').length;});
+      const statusColor=totalFields===0?'#666':totalApplied===totalFields?'#22c55e':totalApplied>0?'#f59e0b':'#3b82f6';
+      h+='<button class="pill'+(activeSubId===sub.id?' active':'')+'" onclick="selectSub('+sub.id+')">';
+      h+='<span class="pill-status" style="background:'+statusColor+';"></span>';
+      h+=esc(sub.name);
+      if(totalFields>0)h+=' <span style="opacity:.6;font-size:9px;">('+totalApplied+'/'+totalFields+')</span>';
+      h+='</button>';
+    });
+    h+='<button class="pill add-pill" onclick="createSubModal()">+ New '+esc(activeCropFilter)+' Event</button>';
+    h+='</div>';
+  }
   cont.innerHTML=h;
+}
+function selectCropFilter(crop){
+  activeCropFilter=crop;
+  activeSubId=null;activeMixIdx=0;
+  hidePanel('pan-event');
+  renderPills();renderEventPanel();draw();renderUI();
 }
 
 // === EVENT PANEL (the right-side panel) ===
@@ -877,11 +1223,15 @@ function renderEventPanel(){
   const cat=activeCategory;
   // Header with subcategory dropdown
   let h='';
-  const subs=subcategories[cat]||[];
-  h+='<div class="fp-title">'+(CAT_LABELS[cat]||cat)+'</div>';
-  h+='<div class="fp-row"><span class="tb-lbl" style="min-width:55px;">Category:</span>';
+  const subsAll=subcategories[cat]||[];
+  // Filter the dropdown to events of the same crop as the active sub (or
+  // the active crop pill). Keeps the picker focused on what the user is doing.
+  const filterCrop=(sub&&sub.crop)||activeCropFilter||'';
+  const subs=filterCrop?subsAll.filter(s=>s.crop===filterCrop):subsAll;
+  h+='<div class="fp-title">'+(CAT_LABELS[cat]||cat)+(filterCrop?' — '+esc(filterCrop):'')+'</div>';
+  h+='<div class="fp-row"><span class="tb-lbl" style="min-width:55px;">Event:</span>';
   h+='<select class="tb-sel" id="ev-sub-sel" style="flex:1;" onchange="selectSub(parseInt(this.value))">';
-  if(subs.length===0)h+='<option value="">— No subcategories —</option>';
+  if(subs.length===0)h+='<option value="">— No events —</option>';
   subs.forEach(s=>{h+='<option value="'+s.id+'"'+(activeSubId===s.id?' selected':'')+'>'+esc(s.name)+'</option>';});
   h+='</select>';
   h+='<button class="tb-btn" onclick="createSubModal()" style="padding:3px 6px;" title="New subcategory">+</button>';
@@ -1166,26 +1516,20 @@ function updateMix(){
 }
 function renderProductRows(){
   const cont=document.getElementById('m-mix-rows');if(!cont)return;
-  const hist=getProductHistory();
-  const knownProducts=Object.keys(hist).sort();
   let h='';
   mixProductRows.forEach((row,i)=>{
-    const isCustom=row._custom||(row.name&&!knownProducts.includes(row.name));
     h+='<div style="display:flex;gap:4px;margin-bottom:5px;align-items:center;flex-wrap:wrap;">';
-    if(isCustom){
-      // Show text input with a back button to switch to dropdown
-      h+='<div style="flex:2;min-width:100px;display:flex;gap:2px;">';
-      h+='<input class="tb-input" style="flex:1;" value="'+esc(row.name)+'" placeholder="Chemical name..." onchange="mixProductRows['+i+'].name=this.value;" autofocus>';
-      h+='<button class="tb-btn" onclick="mixProductRows['+i+']._custom=false;mixProductRows['+i+'].name=\'\';renderProductRows();" style="padding:2px 5px;font-size:9px;" title="Back to list">▾</button>';
-      h+='</div>';
-    }else{
-      // Show select dropdown
-      h+='<select class="tb-sel" style="flex:2;min-width:100px;" onchange="mixProdSelect('+i+',this.value)">';
-      h+='<option value="">— Chemical —</option>';
-      knownProducts.forEach(p=>{h+='<option value="'+esc(p)+'"'+(row.name===p?' selected':'')+'>'+esc(p)+'</option>';});
-      h+='<option value="__custom__">+ New Chemical</option>';
-      h+='</select>';
-    }
+    // Custom inline autocomplete — tighter than the native datalist popup,
+    // and consistent across browsers / iOS.
+    h+='<div style="position:relative;flex:2;min-width:100px;">';
+    h+='<input class="tb-input" id="chem-'+i+'" autocomplete="off" autocapitalize="words" style="width:100%;" '
+      +'oninput="showChemSuggest('+i+',this.value)" '
+      +'onfocus="showChemSuggest('+i+',this.value)" '
+      +'onblur="setTimeout(()=>hideChemSuggest('+i+'),150)" '
+      +'onchange="mixProdTyped('+i+',this.value)" '
+      +'value="'+esc(row.name||'')+'" placeholder="Chemical name…">';
+    h+='<div id="chem-list-'+i+'" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:1000;background:#1a1d24;border:1px solid #444;border-radius:4px;max-height:160px;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 4px 12px rgba(0,0,0,.4);"></div>';
+    h+='</div>';
     // Rate
     h+='<input class="tb-input" style="flex:0 0 55px;text-align:center;" value="'+(row.rate!==''&&row.rate!=null?row.rate:'')+'" placeholder="Rate" onchange="mixProductRows['+i+'].rate=this.value;">';
     // Unit dropdown
@@ -1194,11 +1538,53 @@ function renderProductRows(){
       h+='<option'+(row.unit===u?' selected':'')+'>'+u+'</option>';
     });
     h+='</select>';
-    // Remove button
     if(mixProductRows.length>1)h+='<button class="tb-btn" onclick="mixProductRows.splice('+i+',1);renderProductRows();" style="padding:2px 6px;color:#ef4444;border-color:#ef4444;flex-shrink:0;">✕</button>';
     h+='</div>';
   });
   cont.innerHTML=h;
+}
+// Called when the user types or pastes a chemical name. If the name matches
+// a known product, auto-fill the rate and unit columns; otherwise just store
+// what they typed verbatim.
+function mixProdTyped(idx,val){
+  val=(val||'').trim();
+  mixProductRows[idx].name=val;
+  if(!val)return;
+  const hist=getProductHistory();
+  const known=hist[val];
+  if(known){
+    if(!mixProductRows[idx].rate&&known.rate)mixProductRows[idx].rate=known.rate;
+    if(!mixProductRows[idx].unit||mixProductRows[idx].unit==='oz/ac')mixProductRows[idx].unit=known.unit||'oz/ac';
+    renderProductRows();
+  }
+}
+// Custom typeahead dropdown — replaces the native datalist for tighter UX.
+function showChemSuggest(idx,q){
+  const el=document.getElementById('chem-list-'+idx);if(!el)return;
+  q=(q||'').toLowerCase().trim();
+  const hist=getProductHistory();
+  const all=Object.keys(hist).sort();
+  const matches=q ? all.filter(p=>p.toLowerCase().includes(q)) : all;
+  if(!matches.length){el.style.display='none';return;}
+  el.innerHTML=matches.slice(0,15).map(p=>{
+    return '<div data-name="'+esc(p)+'" data-idx="'+idx+'" '
+      +'onpointerdown="event.preventDefault();" onclick="pickChemFromEl(this)" '
+      +'style="padding:5px 9px;cursor:pointer;color:#ddd;font-size:11px;border-bottom:1px solid #2a2d34;" '
+      +'onmouseover="this.style.background=\'#2a2d34\';" onmouseout="this.style.background=\'transparent\';">'
+      +esc(p)+'</div>';
+  }).join('');
+  el.style.display='block';
+}
+function hideChemSuggest(idx){
+  const el=document.getElementById('chem-list-'+idx);if(el)el.style.display='none';
+}
+function pickChemFromEl(el){
+  const idx=parseInt(el.dataset.idx,10);
+  const name=el.dataset.name;
+  const inp=document.getElementById('chem-'+idx);
+  if(inp) inp.value=name;
+  mixProdTyped(idx,name);
+  hideChemSuggest(idx);
 }
 function mixProdSelect(idx,val){
   if(val==='__custom__'){
@@ -1236,6 +1622,97 @@ function loadMixFromLib(){
   mixProductRows=m.products.map(p=>({name:p.name,rate:p.rate,unit:p.unit||'oz/ac'}));
   if(!mixProductRows.length)mixProductRows=[{name:'',rate:'',unit:'oz/ac'}];
   renderProductRows();
+}
+
+// === MIX LIBRARY MANAGEMENT ===
+// Library mixes are recipe templates stored on `mixLibrary`. They carry across
+// crop years and can be used as a starting point for any event under any crop.
+function showMixLibrary(){
+  const cat=activeCategory;
+  if(!cat){alert('Open Spray or Fertilizer first.');return;}
+  const lib=mixLibrary.filter(m=>m.category===cat);
+  let h='<h3>'+(CAT_LABELS[cat]||cat)+' Mix Library</h3>';
+  h+='<div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.4;">Saved recipes you can drop into any event for any crop. New mixes built inside an event auto-save here. Mixes carry across crop years.</div>';
+  if(!lib.length){
+    h+='<div style="text-align:center;color:#888;padding:14px;font-size:11px;">No mixes saved yet.</div>';
+  } else {
+    h+='<div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">';
+    lib.forEach(m=>{
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:#1a1d24;border-left:3px solid #444;border-radius:4px;">';
+      h+='<div style="flex:1;min-width:0;">';
+      h+='<div style="font-weight:600;font-size:12px;color:#fff;">'+esc(m.name)+'</div>';
+      const prodLine=(m.products||[]).map(p=>esc(p.name)+' <strong>'+p.rate+'</strong> '+esc(p.unit||'oz/ac')).join(' · ');
+      if(prodLine) h+='<div style="font-size:10px;color:#aaa;line-height:1.4;">'+prodLine+'</div>';
+      h+='</div>';
+      h+='<button class="tb-btn" onclick="editLibMix('+m.id+')" style="padding:3px 8px;font-size:10px;flex-shrink:0;">Edit</button>';
+      h+='<button class="tb-btn" onclick="deleteLibMix('+m.id+')" style="padding:3px 8px;font-size:10px;color:#ef4444;border-color:#ef4444;flex-shrink:0;">✕</button>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+  h+='<button class="tb-btn" onclick="addLibMix()" style="margin-top:8px;width:100%;border-style:dashed;">+ Add New Mix</button>';
+  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Close</button></div>';
+  showModal(h);
+}
+function addLibMix(){
+  const cat=activeCategory;
+  closeModal();
+  mixProductRows=[{name:'',rate:'',unit:'oz/ac'}];
+  let h='<h3>New '+(CAT_LABELS[cat]||cat)+' Mix → Library</h3>';
+  h+='<div style="font-size:10px;color:#888;margin-bottom:8px;line-height:1.4;">Color is set per event when you drop this recipe in — different events can show the same recipe in different colors.</div>';
+  h+='<label>Mix Name</label><input id="m-lmix-name" placeholder="C3">';
+  h+='<label>Products</label><div id="m-mix-rows"></div>';
+  h+='<button class="tb-btn" onclick="addProductRow()" style="margin-top:4px;width:100%;border-style:dashed;font-size:10px;">+ Add Product</button>';
+  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal();showMixLibrary();">Back</button>';
+  h+='<button class="btn-primary" onclick="saveLibMix()">Save to Library</button></div>';
+  showModal(h);
+  renderProductRows();
+}
+function saveLibMix(){
+  const cat=activeCategory;
+  const name=document.getElementById('m-lmix-name').value.trim();
+  if(!name){alert('Enter a mix name.');return;}
+  if(mixLibrary.find(m=>m.name===name&&m.category===cat)){
+    alert('A '+cat+' mix with that name already exists in the library.');return;
+  }
+  const prods=mixProductRows.filter(r=>r.name).map(r=>({name:r.name,rate:parseFloat(r.rate)||0,unit:r.unit||'oz/ac'}));
+  mixLibrary.push({id:mixLibNid++,name:name,category:cat,products:prods});
+  closeModal();
+  save();
+  showMixLibrary();
+}
+function editLibMix(id){
+  const m=mixLibrary.find(x=>x.id===id);if(!m)return;
+  closeModal();
+  mixProductRows=(m.products||[]).map(p=>({name:p.name,rate:p.rate,unit:p.unit||'oz/ac'}));
+  if(!mixProductRows.length)mixProductRows=[{name:'',rate:'',unit:'oz/ac'}];
+  let h='<h3>Edit Library Mix: '+esc(m.name)+'</h3>';
+  h+='<label>Mix Name</label><input id="m-lmix-name" value="'+esc(m.name)+'">';
+  h+='<label>Products</label><div id="m-mix-rows"></div>';
+  h+='<button class="tb-btn" onclick="addProductRow()" style="margin-top:4px;width:100%;border-style:dashed;font-size:10px;">+ Add Product</button>';
+  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal();showMixLibrary();">Back</button>';
+  h+='<button class="btn-primary" onclick="updateLibMix('+id+')">Save Changes</button></div>';
+  showModal(h);
+  renderProductRows();
+}
+function updateLibMix(id){
+  const m=mixLibrary.find(x=>x.id===id);if(!m)return;
+  const name=document.getElementById('m-lmix-name').value.trim();
+  if(!name){alert('Enter a mix name.');return;}
+  m.name=name;
+  m.products=mixProductRows.filter(r=>r.name).map(r=>({name:r.name,rate:parseFloat(r.rate)||0,unit:r.unit||'oz/ac'}));
+  // Color lives on the event mix, not on the library entry.
+  delete m.color;
+  closeModal();
+  save();
+  showMixLibrary();
+}
+function deleteLibMix(id){
+  const m=mixLibrary.find(x=>x.id===id);if(!m)return;
+  if(!confirm('Remove "'+m.name+'" from the library?\n\nEvent mixes that copied this recipe stay where they are.'))return;
+  mixLibrary=mixLibrary.filter(x=>x.id!==id);
+  save();
+  showMixLibrary();
 }
 function saveMixToSub(){
   const sub=getActiveSub();if(!sub)return;
@@ -1939,24 +2416,42 @@ function buildTraitRecap(crop,activeFields,title){
 
 // === SUBCATEGORY MODALS ===
 function createSubModal(existing){
-  let h='<h3>'+(existing?'Edit':'New '+CAT_LABELS[activeCategory])+' Subcategory</h3>';
-  h+='<label>Name (e.g. "Bean Burndown", "Rice N App 1")</label>';
-  h+='<input id="m-sub-name" value="'+(existing?esc(existing.name):'')+'" placeholder="Bean Burndown">';
+  // Crop options drawn from active fields (excluding Fallow), plus any crop
+  // already in use on subcategories — and the existing sub's own crop, in case
+  // the user has since unplanted those fields.
+  const cropsFromFields=new Set(F.map(f=>f.crop).filter(c=>c && c !== 'Fallow'));
+  const cropsFromSubs=new Set((subcategories[activeCategory]||[]).map(s=>s.crop).filter(Boolean));
+  const cropsAll=[...new Set([...cropsFromFields,...cropsFromSubs])].sort();
+  const defaultCrop=existing?existing.crop:(activeCropFilter||cropsAll[0]||'');
+  let h='<h3>'+(existing?'Edit':'New '+CAT_LABELS[activeCategory])+' Event</h3>';
+  h+='<label>Crop</label>';
+  h+='<select id="m-sub-crop">';
+  if(!cropsAll.length){
+    h+='<option value="">— No active crops — plant fields first —</option>';
+  } else {
+    cropsAll.forEach(c=>{h+='<option value="'+esc(c)+'"'+(c===defaultCrop?' selected':'')+'>'+esc(c)+'</option>';});
+  }
+  h+='</select>';
+  h+='<label>Name (e.g. "Burndown", "N App 1", "Round 2 Post")</label>';
+  h+='<input id="m-sub-name" value="'+(existing?esc(existing.name):'')+'" placeholder="Burndown">';
   h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button>';
   h+='<button class="btn-primary" onclick="saveSub('+(existing?existing.id:'null')+')">'+(existing?'Save':'Create')+'</button></div>';
   showModal(h);
 }
 function saveSub(existingId){
   const name=document.getElementById('m-sub-name').value.trim();
+  const crop=(document.getElementById('m-sub-crop')?.value||'').trim();
   if(!name){alert('Enter a name.');return;}
+  if(!crop){alert('Pick a crop.');return;}
   if(existingId){
     const sub=(subcategories[activeCategory]||[]).find(s=>s.id===existingId);
-    if(sub)sub.name=name;
+    if(sub){sub.name=name;sub.crop=crop;}
   }else{
     const id=subNid++;
     if(!subcategories[activeCategory])subcategories[activeCategory]=[];
-    subcategories[activeCategory].push({id:id,name:name,mixes:[]});
+    subcategories[activeCategory].push({id:id,name:name,crop:crop,mixes:[]});
     activeSubId=id;activeMixIdx=0;
+    activeCropFilter=crop; // jump to this crop's filter so the new event is visible
   }
   closeModal();renderPills();renderEventPanel();save();
 }
@@ -3590,6 +4085,8 @@ function showEdit(id){
   if(![...cs.options].some(o=>o.value===f.crop))cs.add(new Option(f.crop));
   cs.value=f.crop;popVar();document.getElementById('ed-var').value=f.variety;
   document.getElementById('ed-plantdate').value=f.plantDate||'';
+  popProgramsForEdit(f.crop);
+  document.getElementById('ed-program').value=f.program||'';
   showPanel('pan-edit');
 }
 function popVar(){
@@ -3599,6 +4096,18 @@ function popVar(){
 }
 function edSavePlantDate(){if(!editId)return;const f=F.find(x=>x.id===editId);if(!f)return;
   f.plantDate=document.getElementById('ed-plantdate').value;save();}
+// Populate the ed-program select with the active field's crop programs.
+function popProgramsForEdit(crop){
+  const sel=document.getElementById('ed-program');if(!sel)return;
+  const list=programs[crop]||[];
+  if(!list.length){
+    sel.innerHTML='<option value="">— No programs (add via Map ▾ → Program → Edit) —</option>';
+  } else {
+    sel.innerHTML='<option value="">— None —</option>'+list.map(p=>'<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>').join('');
+  }
+}
+function edSaveProgram(){if(!editId)return;const f=F.find(x=>x.id===editId);if(!f)return;
+  f.program=document.getElementById('ed-program').value;save();restyle();renderUI();}
 function edSave(){if(!editId)return;const f=F.find(x=>x.id===editId);if(!f)return;
   f.crop=document.getElementById('ed-crop').value;f.variety=document.getElementById('ed-var').value;
   ensureColors(f);popFilters();sel.clear();editId=null;hidePanel('pan-edit');restyle();renderUI();save();}
@@ -3677,11 +4186,64 @@ function hideMenuOnClick(e){
   const m=document.getElementById('tb-menu');
   if(!m.contains(e.target))hideMenu();
 }
+// View dropdown — populated on open with current crops, anchors below the
+// View button. Selects fall through to viewVariety/viewTrait which still
+// reference the same #var-pick / #trait-pick IDs (now living inside this menu).
+function toggleViewMenu(){
+  const m=document.getElementById('view-menu');
+  if(m.style.display==='none' || !m.style.display){
+    // Repopulate selects with the current set of crops in F. Also reset
+    // display, since legacy view* functions still call .style.display='none'
+    // on these elements (a holdover from when they were toolbar-anchored).
+    const cropsAll=[...new Set((F||[]).map(f=>f.crop).filter(Boolean))].sort();
+    const vp=document.getElementById('var-pick');
+    if(vp){
+      vp.style.display='';
+      vp.innerHTML='<option value="">— Pick crop —</option>'+cropsAll.map(c=>'<option value="'+c+'"'+(c===varCrop?' selected':'')+'>'+c+'</option>').join('');
+    }
+    const traitable=cropsAll.filter(c=>typeof TRAIT_CROPS!=='undefined' && TRAIT_CROPS.has(c));
+    const tp=document.getElementById('trait-pick');
+    if(tp){
+      tp.style.display='';
+      tp.innerHTML='<option value="">— Pick crop —</option>'+traitable.map(c=>'<option value="'+c+'"'+(c===traitCrop?' selected':'')+'>'+c+'</option>').join('');
+    }
+    // Program: any crop that has at least one program defined.
+    const programmable=cropsAll.filter(c=>(programs[c]||[]).length>0);
+    const pp=document.getElementById('program-pick');
+    if(pp){
+      pp.style.display='';
+      if(!programmable.length){
+        pp.innerHTML='<option value="">— No programs yet — click Edit to add —</option>';
+      } else {
+        pp.innerHTML='<option value="">— Pick crop —</option>'+programmable.map(c=>'<option value="'+c+'"'+(c===programCrop?' selected':'')+'>'+c+'</option>').join('');
+      }
+    }
+    const btn=document.querySelector('[onclick="toggleViewMenu()"]');
+    if(btn){
+      const r=btn.getBoundingClientRect();
+      m.style.top=(r.bottom+4)+'px';
+      m.style.left=Math.max(8, Math.min(r.left, window.innerWidth-238))+'px';
+    }
+    m.style.display='block';
+    setTimeout(()=>{document.addEventListener('click',hideViewMenuOnClick,{once:true});},10);
+  }else{
+    m.style.display='none';
+  }
+}
+function hideViewMenu(){
+  const m=document.getElementById('view-menu');
+  if(m) m.style.display='none';
+}
+function hideViewMenuOnClick(e){
+  const m=document.getElementById('view-menu');
+  if(m && !m.contains(e.target))hideViewMenu();
+}
 function showPanel(id){
-  ['pan-edit','pan-event','pan-inventory','pan-traits'].forEach(p=>{const el=document.getElementById(p);if(el)el.classList.remove('show');});
+  ['pan-edit','pan-event','pan-inventory','pan-traits','pan-programs'].forEach(p=>{const el=document.getElementById(p);if(el)el.classList.remove('show');});
   const el=document.getElementById(id);if(el)el.classList.add('show');curPanel=id;
   if(id==='pan-inventory')renderInventory();
   if(id==='pan-traits')renderTraitPanel();
+  if(id==='pan-programs')renderProgramPanel();
   if(id==='pan-event')eventPanelCollapsed=false;
 }
 function hidePanel(id){const el=document.getElementById(id);if(el)el.classList.remove('show');if(curPanel===id)curPanel=null;}
@@ -3729,11 +4291,33 @@ function renderUI(){
     const byCode={};cf.forEach(f=>{const t=traitFor(f.crop,f.variety);if(!t)return;if(!byCode[t.code])byCode[t.code]={t:t,acres:0,n:0};byCode[t.code].acres+=f.acres;byCode[t.code].n++;});
     const order=(TRAITS[traitCrop]||[]).map(t=>t.code);
     order.forEach(code=>{const g=byCode[code];if(!g)return;h+='<span class="leg-item"><span class="leg-sw" style="background:'+g.t.color+';"></span>'+esc(g.t.name)+' ('+g.acres.toFixed(0)+'ac)</span> ';});
+  }else if(mode==='program'){
+    const cf=ff.filter(f=>f.crop===programCrop);
+    (programs[programCrop]||[]).forEach(p=>{
+      const pf=cf.filter(f=>f.program===p.name);
+      if(pf.length) h+='<span class="leg-item"><span class="leg-sw" style="background:'+p.color+';"></span>'+esc(p.name)+' ('+pf.reduce((s,f)=>s+f.acres,0).toFixed(0)+'ac)</span> ';
+    });
+    const unenrolled=cf.filter(f=>!f.program);
+    if(unenrolled.length) h+='<span class="leg-item"><span class="leg-sw" style="background:#9E9E9E;"></span>Not enrolled ('+unenrolled.reduce((s,f)=>s+f.acres,0).toFixed(0)+'ac)</span> ';
   }else{h='<span style="color:#666;font-size:10px;">Select a view above</span>';}
   lg.innerHTML=h;
   const si=document.getElementById('sel-info');
-  if(sel.size>0){const a=F.filter(f=>sel.has(f.id)).reduce((s,f)=>s+f.acres,0);si.textContent=sel.size+' sel · '+a.toFixed(0)+'ac';}else si.textContent='';
-  document.getElementById('desel').style.display=sel.size>0?'block':'none';
+  const ds=document.getElementById('desel');
+  const sb=document.getElementById('sel-badge');
+  if(sel.size>0){
+    const a=F.filter(f=>sel.has(f.id)).reduce((s,f)=>s+f.acres,0);
+    if(si)si.textContent=sel.size+' sel · '+a.toFixed(0)+'ac';
+    if(ds){ds.style.display='block';ds.textContent='✕ Deselect';}
+    // Big bottom-left badge for quick read while doing acreage math.
+    if(sb){
+      sb.style.display='block';
+      sb.innerHTML=sel.size+' field'+(sel.size===1?'':'s')+' · <span style="font-size:14px;">'+a.toFixed(1)+' ac</span>';
+    }
+  }else{
+    if(si)si.textContent='';
+    if(ds){ds.style.display='none';ds.textContent='✕ Deselect';}
+    if(sb)sb.style.display='none';
+  }
   const cp=document.getElementById('sel-color-pick');if(cp)cp.style.display=(sel.size>0&&!getActiveSub())?'block':'none';
   document.getElementById('bat-n').textContent=sel.size;
 }
@@ -3775,7 +4359,7 @@ function dl(c,n,t){const b=new Blob([c],{type:t}),u=URL.createObjectURL(b),a=doc
 
 // === SAVE/LOAD ===
 const SK='fc_v7';
-function save(){try{localStorage.setItem(SK,JSON.stringify({v:7,F,subcategories,mixNid,subNid,mixLibrary,mixLibNid,vendors,applicators,applicatorRates,deliveryLocs,purchases,purchaseNid,VC,CC,varietyTraits,traitColors,farmInfo,spendCategories,spendCrops,bills,billNid}));}catch(e){}}
+function save(){try{localStorage.setItem(SK,JSON.stringify({v:7,F,subcategories,mixNid,subNid,mixLibrary,mixLibNid,vendors,applicators,applicatorRates,deliveryLocs,purchases,purchaseNid,VC,CC,varietyTraits,traitColors,programs,farmInfo,spendCategories,spendCrops,bills,billNid}));}catch(e){}}
 function loadSaved(){try{const r=localStorage.getItem(SK);if(!r)return false;const d=JSON.parse(r);if(!d.F||!d.F.length||d.v!==7)return false;
   if(!d.F[0].points||!d.F[0].name)return false;
   F=d.F;nid=F.reduce((m,f)=>Math.max(m,f.id),0)+1;
@@ -3787,14 +4371,16 @@ function loadSaved(){try{const r=localStorage.getItem(SK);if(!r)return false;con
   if(d.VC)Object.assign(VC,d.VC);if(d.CC)Object.assign(CC,d.CC);
   if(d.varietyTraits)varietyTraits=d.varietyTraits;
   if(d.traitColors)traitColors=d.traitColors;
+  if(d.programs)programs=d.programs;
   if(d.farmInfo)Object.assign(farmInfo,d.farmInfo);
   if(d.spendCategories)spendCategories=d.spendCategories;
   if(d.spendCrops)spendCrops=d.spendCrops;
   if(d.bills)bills=d.bills;if(d.billNid)billNid=d.billNid;
   migratePurchaseSplits(); // convert old {crop,category} items to splits arrays
+  migrateSubcategoryCrops(); // backfill subcategory.crop on saves that predate it
   return true;}catch(e){return false;}}
 function resetData(){if(confirm('Reset all changes?')){localStorage.removeItem(SK);location.reload();}}
-function saveFile(){dl(JSON.stringify({v:7,F,subcategories,mixNid,subNid,mixLibrary,mixLibNid,vendors,applicators,applicatorRates,deliveryLocs,purchases,purchaseNid,VC,CC,varietyTraits,traitColors,farmInfo,spendCategories,spendCrops,bills,billNid},null,2),'fc-save.json','application/json');}
+function saveFile(){dl(JSON.stringify({v:7,F,subcategories,mixNid,subNid,mixLibrary,mixLibNid,vendors,applicators,applicatorRates,deliveryLocs,purchases,purchaseNid,VC,CC,varietyTraits,traitColors,programs,farmInfo,spendCategories,spendCrops,bills,billNid},null,2),'fc-save.json','application/json');}
 
 // Upgrade pre-splits purchase items (where crop/category lived directly on the item)
 // to the new splits model. Safe to call multiple times — already-migrated items are left alone.
@@ -3873,9 +4459,13 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
     a*=0.5;return[cx/(6*a),cy/(6*a)];
   };
   function pColor(f){
-    if(sub){for(const mx of sub.mixes){const ef=mx.fields[f.id];if(ef)return ef.status==='applied'?'#22C55E':mx.color;}return null;}
+    // Both planned and applied use the mix's color so the legend matches the
+    // map. (Earlier this returned a hardcoded green for applied, which made
+    // every mix's applied fields look identical and never appear in the legend.)
+    if(sub){for(const mx of sub.mixes){const ef=mx.fields[f.id];if(ef)return mx.color;}return null;}
     if(mode==='variety'){if(f.crop===varCrop)return VC[f.variety]||AC[f.id%12];return null;}
     if(mode==='trait'){if(f.crop===traitCrop){const t=traitFor(f.crop,f.variety);return t?t.color:'#9E9E9E';}return null;}
+    if(mode==='program'){if(f.crop===programCrop){const p=(programs[f.crop]||[]).find(p=>p.name===f.program);return p?p.color:'#9E9E9E';}return null;}
     if(mode==='crop')return CC[f.crop]||'#999';return CC[f.crop]||'#2196F3';
   }
   let svg='';
@@ -3943,6 +4533,15 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
     order.forEach(code=>{const g=byCode[code];if(!g)return;
       cLeg+=legItem(g.t.color,g.t.name,g.fields.length,g.acres);
     });
+  }else if(mode==='program'){
+    // Group active fields by their program enrollment. Unenrolled rolls into a "Not enrolled" bucket.
+    const list=programs[programCrop]||[];
+    list.forEach(p=>{
+      const pf=activeFields.filter(f=>f.crop===programCrop&&f.program===p.name);
+      if(pf.length) cLeg+=legItem(p.color,p.name,pf.length,pf.reduce((s,f)=>s+f.acres,0));
+    });
+    const unenrolled=activeFields.filter(f=>f.crop===programCrop&&!f.program);
+    if(unenrolled.length) cLeg+=legItem('#9E9E9E','Not enrolled',unenrolled.length,unenrolled.reduce((s,f)=>s+f.acres,0));
   }else{[...new Set(activeFields.map(f=>f.crop))].sort().forEach(cr=>{const cf=activeFields.filter(f=>f.crop===cr);cLeg+=legItem(CC[cr]||'#999',cr,cf.length,cf.reduce((s,f)=>s+f.acres,0));});}
   // Variety/crop row: just the swatch cards, no "LEGEND" label
   if(cLeg){
@@ -4050,11 +4649,14 @@ function showPrintOverlay(){
   if(mode==='variety'&&varCrop&&!sub&&sel.size===0){active=active.filter(f=>f.crop===varCrop);}
   // In trait mode, only include fields matching the selected crop
   if(mode==='trait'&&traitCrop&&!sub&&sel.size===0){active=active.filter(f=>f.crop===traitCrop);}
+  // In program mode, only include fields matching the selected crop
+  if(mode==='program'&&programCrop&&!sub&&sel.size===0){active=active.filter(f=>f.crop===programCrop);}
 
   let title=sub?sub.name:'Twin Lakes Farm II';
   if(!sub&&mode==='variety')title=varCrop+' Variety Map';
   if(!sub&&mode==='crop')title='Crop Map';
   if(!sub&&mode==='trait')title=traitCrop+' Herbicide Trait Map';
+  if(!sub&&mode==='program')title=programCrop+' Program Map';
 
   // Cluster fields - tighter threshold for large sets to create more zoomed-in maps
   const clusterThreshold=active.length>30?0.012:active.length>15?0.015:0.02;
@@ -4556,8 +5158,9 @@ async function enterFarm(farmId){
 function carryForwardYearJson(oldRaw){
   let d;
   try { d = JSON.parse(oldRaw); } catch(_){ return JSON.stringify({ v:7, F:[], subcategories:{spray:[],fertilizer:[]} }); }
-  // Reset per-field crop/variety/plantDate (keep field geometry, name, acres, farm).
-  (d.F || []).forEach(f => { f.crop = ''; f.variety = ''; f.plantDate = ''; });
+  // Reset per-field crop/variety/plantDate/program (keep field geometry, name, acres, farm).
+  // The programs[] config carries forward; only per-field enrollments reset.
+  (d.F || []).forEach(f => { f.crop = ''; f.variety = ''; f.plantDate = ''; f.program = ''; });
   // Reset mix field-assignments (keep recipes & subcategory structure).
   if(d.subcategories){
     Object.keys(d.subcategories).forEach(cat => {
