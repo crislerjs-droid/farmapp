@@ -2355,12 +2355,17 @@ function showSprayOrderOverlay(sub,orderFields){
 }
 
 // Compute the per-page total for one product line: rate (per acre) × cluster acres.
-// Returns the formatted string (e.g. "50 oz" or "12.5 gal"). Strips a trailing
-// "/ac" off the rate unit so totals read as raw quantity, not a rate.
+// Liquid measures (oz / fl oz / qt / pt) get converted to gallons since that's
+// what the sprayer is actually filled in. Solid measures (lb, etc.) and rates
+// already in gallons stay in their native unit.
 function pageProductTotal(rate,acres,unit){
   const v=(parseFloat(rate)||0)*acres;
   const raw=(unit||'oz/ac').replace(/\/ac$/i,'').trim();
-  const fmt=n=>n.toLocaleString(undefined,{maximumFractionDigits:n>=100?0:1});
+  const u=raw.toLowerCase();
+  const fmt=n=>n.toLocaleString(undefined,{maximumFractionDigits:n>=10?1:2});
+  if(u==='oz'||u==='fl oz'||u==='floz') return fmt(v/128)+' gal';
+  if(u==='qt') return fmt(v/4)+' gal';
+  if(u==='pt') return fmt(v/8)+' gal';
   return fmt(v)+' '+raw;
 }
 
