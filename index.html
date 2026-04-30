@@ -178,8 +178,11 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div class="tb-row">
     <span class="tb-title" onclick="goHome()">🌾 FIELD COMMANDER</span>
     <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;">Loading…</span>
-    <span style="margin-left:auto;display:flex;align-items:center;gap:4px;">
-      <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <span style="display:flex;align-items:center;gap:4px;">
+        <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
+      </span>
+      <button class="tb-btn" onclick="hardReload()" title="Force a fresh reload from the server (clears cache)" style="padding:4px 8px;min-height:28px;font-size:13px;line-height:1;">↻</button>
     </span>
   </div>
   <div class="tb-row">
@@ -1215,6 +1218,15 @@ function doFilter(){const el=document.getElementById('f-farm');fFarm=el?el.value
 
 // === VIEW MODES ===
 function goHome(){activeCategory=null;activeSubId=null;activeMixIdx=0;viewClear();}
+
+// Force a clean reload that bypasses the browser cache. Cache-buster query
+// string sidesteps Safari/Chrome's aggressive caching of the index.html so
+// the user actually picks up the latest deploy. Also flushes any pending
+// debounced cloud save first so unsynced edits aren't lost on the way out.
+function hardReload(){
+  try{ if(typeof __syncTimer !== 'undefined' && __syncTimer){ clearTimeout(__syncTimer); if(typeof cloudSave === 'function') cloudSave(); } }catch(e){}
+  window.location.href = window.location.pathname + '?_=' + Date.now();
+}
 function viewClear(){mode='none';varCrop='';traitCrop='';programCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;activeCropFilter=null;
   document.getElementById('var-pick').style.display='none';
   document.getElementById('trait-pick').style.display='none';
