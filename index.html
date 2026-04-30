@@ -8,17 +8,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+html,body{height:100%;}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;-webkit-tap-highlight-color:transparent;}
 #map{width:100%;height:100%;position:absolute;top:0;left:0;}
 .map-wrap{flex:1;position:relative;min-height:0;}
 
 /* Toolbar */
-.tb{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;flex-wrap:wrap;z-index:100;width:100%;box-sizing:border-box;position:sticky;top:0;}
-/* Narrow screens (iPhone, small tablets): compress toolbar so it wraps cleanly */
+.tb{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;flex-wrap:wrap;z-index:1000;width:100%;box-sizing:border-box;position:relative;touch-action:manipulation;}
+.tb,.tb *{-webkit-tap-highlight-color:rgba(232,185,49,.25);}
+/* Narrow screens (iPhone, small tablets): compress toolbar but keep tap
+   targets at ~36px so fingers reliably hit the buttons. */
 @media (max-width: 700px) {
-  .tb{padding:5px 8px;gap:4px;}
-  .tb-btn{padding:5px 8px;font-size:10px;}
-  .tb-title{font-size:13px;margin-right:4px;}
+  .tb{padding:6px 8px;gap:4px;}
+  .tb-btn{padding:8px 12px;font-size:11px;min-height:36px;}
+  .tb-title{font-size:14px;margin-right:4px;}
   .tb-sep{display:none;} /* hide divider bars on mobile to save horizontal space */
 }
 .tb-title{font-weight:800;font-size:15px;color:#e8b931;margin-right:6px;cursor:pointer;}
@@ -255,6 +258,10 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlGeoJSON();hideMenu();">📦 GeoJSON</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlCSV();hideMenu();">📊 CSV</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="dlKML();hideMenu();">🌍 KML</div>
+  <div style="height:1px;background:#333;margin:6px 0;"></div>
+  <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">Lists</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="manageApplicators();hideMenu();">👤 Applicators</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="manageVendors();hideMenu();">🏢 Vendors</div>
   <div style="height:1px;background:#333;margin:6px 0;"></div>
   <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">Cloud</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="cloudSave();hideMenu();" title="Force an immediate cloud sync (auto-sync also runs after each change)">☁️ Force Sync Now</div>
@@ -789,6 +796,129 @@ function removeProgram(crop,idx){
   draw();renderUI();
 }
 
+// === APPLICATOR + VENDOR LIST MANAGEMENT ===
+// Simple add/rename/remove modals for the applicator and vendor master lists.
+// Renaming propagates to existing event records and applicatorRates so prior
+// data stays linked to the new label.
+function manageApplicators(){
+  let h='<h3>Applicators</h3>';
+  h+='<div style="font-size:10px;color:#888;margin-bottom:8px;line-height:1.4;">Names that show in the Mark Complete applicator dropdown. Renaming updates existing applied events to keep them linked.</div>';
+  if(!applicators.length){
+    h+='<div style="font-size:11px;color:#888;text-align:center;padding:10px 0;">No applicators yet.</div>';
+  } else {
+    applicators.forEach((a,i)=>{
+      h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:#1a1d24;border-radius:4px;margin-bottom:3px;">';
+      h+='<input class="tb-input" value="'+esc(a)+'" style="flex:1;font-size:12px;" onchange="renameApplicator('+i+',this.value)">';
+      h+='<button class="tb-btn" onclick="removeApplicator('+i+')" style="padding:3px 8px;color:#ef4444;border-color:#ef4444;font-size:10px;">✕</button>';
+      h+='</div>';
+    });
+  }
+  h+='<div style="display:flex;gap:6px;margin-top:8px;">';
+  h+='<input class="tb-input" id="al-new" placeholder="New applicator name" style="flex:1;" onkeydown="if(event.key===\'Enter\')addApplicator()">';
+  h+='<button class="tb-btn" onclick="addApplicator()" style="background:#22c55e;color:#111;border:none;padding:6px 14px;">Add</button>';
+  h+='</div>';
+  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Done</button></div>';
+  showModal(h);
+  setTimeout(()=>{const el=document.getElementById('al-new');if(el)el.focus();},10);
+}
+function addApplicator(){
+  const inp=document.getElementById('al-new');if(!inp)return;
+  const v=(inp.value||'').trim();if(!v)return;
+  if(applicators.includes(v)){alert('Already in list.');return;}
+  applicators.push(v);
+  save();
+  manageApplicators();
+}
+function renameApplicator(idx,newName){
+  newName=(newName||'').trim();if(!newName){manageApplicators();return;}
+  const old=applicators[idx];if(old===newName)return;
+  if(applicators.some((a,i)=>i!==idx&&a===newName)){alert('Already in list.');manageApplicators();return;}
+  applicators[idx]=newName;
+  // Carry the rename through to existing applied events and the rate dictionary.
+  CATEGORIES.forEach(cat=>{(subcategories[cat]||[]).forEach(sub=>{sub.mixes.forEach(mx=>{
+    Object.values(mx.fields||{}).forEach(ef=>{if(ef.applicator===old)ef.applicator=newName;});
+  });});});
+  if(applicatorRates[old]!=null){applicatorRates[newName]=applicatorRates[old];delete applicatorRates[old];}
+  save();
+  manageApplicators();
+}
+function removeApplicator(idx){
+  const name=applicators[idx];if(!name)return;
+  let uses=0;
+  CATEGORIES.forEach(cat=>{(subcategories[cat]||[]).forEach(sub=>{sub.mixes.forEach(mx=>{
+    Object.values(mx.fields||{}).forEach(ef=>{if(ef.applicator===name)uses++;});
+  });});});
+  const msg=uses>0
+    ? 'Remove "'+name+'" from the dropdown?\n\n'+uses+' existing applied event'+(uses===1?'':'s')+' will keep "'+name+'" recorded but the name won\'t appear in new pickers.'
+    : 'Remove "'+name+'"?';
+  if(!confirm(msg))return;
+  applicators.splice(idx,1);
+  save();
+  manageApplicators();
+}
+
+function manageVendors(){
+  let h='<h3>Vendors</h3>';
+  h+='<div style="font-size:10px;color:#888;margin-bottom:8px;line-height:1.4;">Names that show in vendor dropdowns (purchases, fertilizer source). Renaming updates existing records to keep them linked.</div>';
+  if(!vendors.length){
+    h+='<div style="font-size:11px;color:#888;text-align:center;padding:10px 0;">No vendors yet.</div>';
+  } else {
+    vendors.forEach((v,i)=>{
+      h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:#1a1d24;border-radius:4px;margin-bottom:3px;">';
+      h+='<input class="tb-input" value="'+esc(v)+'" style="flex:1;font-size:12px;" onchange="renameVendor('+i+',this.value)">';
+      h+='<button class="tb-btn" onclick="removeVendor('+i+')" style="padding:3px 8px;color:#ef4444;border-color:#ef4444;font-size:10px;">✕</button>';
+      h+='</div>';
+    });
+  }
+  h+='<div style="display:flex;gap:6px;margin-top:8px;">';
+  h+='<input class="tb-input" id="vd-new" placeholder="New vendor name" style="flex:1;" onkeydown="if(event.key===\'Enter\')addVendor()">';
+  h+='<button class="tb-btn" onclick="addVendor()" style="background:#22c55e;color:#111;border:none;padding:6px 14px;">Add</button>';
+  h+='</div>';
+  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Done</button></div>';
+  showModal(h);
+  setTimeout(()=>{const el=document.getElementById('vd-new');if(el)el.focus();},10);
+}
+function addVendor(){
+  const inp=document.getElementById('vd-new');if(!inp)return;
+  const v=(inp.value||'').trim();if(!v)return;
+  if(vendors.includes(v)){alert('Already in list.');return;}
+  vendors.push(v);
+  save();
+  manageVendors();
+}
+function renameVendor(idx,newName){
+  newName=(newName||'').trim();if(!newName){manageVendors();return;}
+  const old=vendors[idx];if(old===newName)return;
+  if(vendors.some((v,i)=>i!==idx&&v===newName)){alert('Already in list.');manageVendors();return;}
+  vendors[idx]=newName;
+  // Update purchases (vendor field on each purchase doc).
+  purchases.forEach(p=>{if(p.vendor===old)p.vendor=newName;});
+  // Update fert event source vendors.
+  CATEGORIES.forEach(cat=>{(subcategories[cat]||[]).forEach(sub=>{sub.mixes.forEach(mx=>{
+    Object.values(mx.fields||{}).forEach(ef=>{if(ef.vendor===old)ef.vendor=newName;});
+  });});});
+  // Update bills.
+  bills.forEach(b=>{if(b.vendor===old)b.vendor=newName;});
+  save();
+  manageVendors();
+}
+function removeVendor(idx){
+  const name=vendors[idx];if(!name)return;
+  let uses=0;
+  purchases.forEach(p=>{if(p.vendor===name)uses++;});
+  CATEGORIES.forEach(cat=>{(subcategories[cat]||[]).forEach(sub=>{sub.mixes.forEach(mx=>{
+    Object.values(mx.fields||{}).forEach(ef=>{if(ef.vendor===name)uses++;});
+  });});});
+  bills.forEach(b=>{if(b.vendor===name)uses++;});
+  const msg=uses>0
+    ? 'Remove "'+name+'" from the dropdown?\n\n'+uses+' existing record'+(uses===1?'':'s')+' will keep "'+name+'" recorded but the name won\'t appear in new pickers.'
+    : 'Remove "'+name+'"?';
+  if(!confirm(msg))return;
+  vendors.splice(idx,1);
+  save();
+  manageVendors();
+}
+
 // === STATE ===
 let F=[],map,layers={},fieldLabelLayer=null,nid=1,editId=null,curPanel=null,fFarm="";
 let sel=new Set();
@@ -1295,20 +1425,20 @@ function renderEventPanel(){
           const ef=mx.fields[fid];
           const isApplied=ef.status==='applied';
           const accent=isApplied?'#22c55e':'#666';
-          h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#262626;padding:2px 4px 2px 6px;border-radius:3px;border-left:3px solid '+accent+';margin:1px 2px 1px 0;font-size:10px;vertical-align:middle;">';
-          h+='<span style="color:#ddd;">'+esc(f.name)+'</span>';
+          h+='<div style="display:flex;align-items:center;gap:6px;background:#262626;padding:3px 6px 3px 8px;border-radius:3px;border-left:3px solid '+accent+';margin:2px 0;font-size:10px;">';
+          h+='<span style="color:#ddd;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(f.name)+'</span>';
           if(isApplied){
             let metaTxt=fmtDate(ef.dateApplied);
             if(ef.applicator) metaTxt+=' · '+ef.applicator;
             if(ef.vendor) metaTxt+=' · from '+ef.vendor;
-            h+='<span style="color:#888;font-size:9px;">'+esc(metaTxt)+'</span>';
-            h+='<button class="tb-btn" onclick="event.stopPropagation();editApplicationModal('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;" title="Edit date / applicator / vendor">✎</button>';
-            h+='<button class="tb-btn" onclick="event.stopPropagation();unmarkApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;" title="Undo — revert to planned">↺</button>';
+            h+='<span style="color:#888;font-size:9px;flex-shrink:0;">'+esc(metaTxt)+'</span>';
+            h+='<button class="tb-btn" onclick="event.stopPropagation();editApplicationModal('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;flex-shrink:0;" title="Edit date / applicator / vendor">✎</button>';
+            h+='<button class="tb-btn" onclick="event.stopPropagation();unmarkApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;flex-shrink:0;" title="Undo — revert to planned">↺</button>';
           } else {
-            h+='<button class="tb-btn" onclick="event.stopPropagation();markFieldApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#22c55e;border-color:#22c55e;" title="Mark only this field as applied (uses the date + applicator in the Mark Complete form below)">✓</button>';
+            h+='<button class="tb-btn" onclick="event.stopPropagation();markFieldApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#22c55e;border-color:#22c55e;flex-shrink:0;" title="Mark only this field as applied (uses the date + applicator in the Mark Complete form below)">✓</button>';
           }
-          h+='<button class="tb-btn" onclick="event.stopPropagation();removeFieldFromMix('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#ef4444;border-color:#ef4444;" title="Remove field from this mix">✕</button>';
-          h+='</span>';
+          h+='<button class="tb-btn" onclick="event.stopPropagation();removeFieldFromMix('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#ef4444;border-color:#ef4444;flex-shrink:0;" title="Remove field from this mix">✕</button>';
+          h+='</div>';
         });
         h+='</div>';
       }
@@ -2194,7 +2324,7 @@ function showSprayOrderOverlay(sub,orderFields){
       pagesHTML+='<div style="font-size:9px;color:#666;">'+new Date().toLocaleDateString()+' — '+esc(m.farmNames)+'</div></div>';
       pagesHTML+='<div style="text-align:right;font-size:10px;"><strong>Twin Lakes Farm II</strong><br>'+m.fieldCount+' Fields · '+m.acres.toFixed(0)+' ac</div></div>';
       pagesHTML+=m.svgStr;
-      pagesHTML+='<div style="margin-top:6px;line-height:1.8;">'+m.leg+'</div>';
+      pagesHTML+='<div style="margin-top:3px;line-height:1.25;">'+m.leg+'</div>';
       pagesHTML+=m.mixBlock;
       pagesHTML+='</div>';
     }
@@ -4511,14 +4641,14 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
     sub.mixes.forEach(mx=>{
       const mf=activeFields.filter(f=>mx.fields[f.id]);if(!mf.length)return;
       const ac=mf.reduce((s,f)=>s+f.acres,0);
-      cMix+='<div style="margin-top:6px;padding:6px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
+      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
-          '<strong style="font-size:12px;color:#111;">'+esc(mx.name)+'</strong>'+
-          '<span style="font-size:11px;color:#444;font-weight:600;">'+mf.length+' fld · '+ac.toFixed(0)+' ac</span>'+
+          '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
+          '<span style="font-size:12px;color:#444;font-weight:600;">'+mf.length+' fld · '+ac.toFixed(0)+' ac</span>'+
         '</div>';
       if(mx.products&&mx.products.length){
-        cMix+='<div style="font-size:10px;color:#444;padding-left:22px;line-height:1.45;">'+
+        cMix+='<div style="font-size:11.5px;color:#444;padding-left:22px;line-height:1.4;">'+
           mx.products.map(p=>esc(p.name)+' <strong>'+p.rate+'</strong> '+esc(p.unit)).join(' &nbsp;·&nbsp; ')+
         '</div>';
       }
@@ -4737,7 +4867,7 @@ function showPrintOverlay(){
       pagesHTML+='<div style="font-size:9px;color:#666;">'+new Date().toLocaleDateString()+' — '+esc(m.farmNames)+'</div></div>';
       pagesHTML+='<div style="text-align:right;font-size:10px;"><strong>Twin Lakes Farm II</strong><br>'+m.fieldCount+' Fields · '+m.acres.toFixed(0)+' ac</div></div>';
       pagesHTML+=m.svgStr;
-      pagesHTML+='<div style="margin-top:6px;line-height:1.8;">'+m.leg+'</div>';
+      pagesHTML+='<div style="margin-top:3px;line-height:1.25;">'+m.leg+'</div>';
       pagesHTML+=m.mixBlock;
       pagesHTML+='</div>';
     }
@@ -4803,12 +4933,15 @@ function printOverlayPage(){
     // because flex:1 1 auto on .map-holder asked the SVG to size to its content
     // first; switching to flex:1 1 0 makes the map fill purely the leftover
     // space after siblings. Also adds modern break-inside / clip overflow.
-    css+='html,body{width:100%;height:100%;overflow:hidden;}'+
-      '.sheet{display:flex;flex-direction:column;width:100%;height:9.9in;max-height:9.9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
+    // Sheet sized to viewport on screen (so iOS print captures the whole layout
+    // instead of cutting off content past the visible viewport), then locked to
+    // 9.9in for the actual print medium.
+    css+='html,body{width:100%;height:100vh;overflow:hidden;}'+
+      '.sheet{display:flex;flex-direction:column;width:100%;height:100vh;max-height:9.9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
       '.sheet>*{flex-shrink:0;break-inside:avoid;page-break-inside:avoid;}'+
       '.sheet>.map-holder{flex:1 1 0!important;min-height:0!important;width:100%;overflow:hidden;}'+
       '.map-holder svg{width:100%;height:100%;max-height:100%;display:block;}'+
-      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.9in;overflow:hidden;}}';
+      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.9in;max-height:9.9in;overflow:hidden;}}';
   }else{
     // Recap pages: allow natural flow; avoid page breaks inside table rows
     css+='.sheet{width:100%;}'+
