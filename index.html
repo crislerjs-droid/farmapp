@@ -5008,8 +5008,6 @@ function poToggleLabels(){
 function printOverlayPage(){
   const page=document.querySelector('.po-page[style*="display: block"],.po-page:not([style*="display: none"])');
   if(!page)return;
-  const w=window.open('','_blank');
-  if(!w){alert('Pop-up blocked. Try screenshot instead.');return;}
   // Detect whether current page is a map page (has .map-holder) or a recap page (no map)
   const isMapPage=!!page.querySelector('.map-holder');
   const inner=page.querySelector(':scope > div');
@@ -5043,13 +5041,32 @@ function printOverlayPage(){
       'tr{page-break-inside:avoid;page-break-after:auto;}'+
       'thead{display:table-header-group;}';
   }
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><title>Field Map</title><style>'+css+'</style></head><body><div class="sheet">');
-  w.document.write(content);
-  w.document.write('</div></body></html>');
-  w.document.close();
-  // Trigger print from the parent window after a short settle so the popup
-  // body is empty of any extra script/text nodes that could nudge layout.
-  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 500);
+  // Print via a hidden iframe instead of a popup window. The popup approach
+  // worked but iOS Safari has no way to auto-close the popup tab after the
+  // user finishes the print/share sheet, so they got stuck on a blank tab
+  // and had to nuke the browser. With an iframe the user never leaves the
+  // app — the print dialog appears in-place and dismissing it just returns
+  // to the print preview overlay.
+  const old=document.getElementById('print-iframe');
+  if(old) old.remove();
+  const iframe=document.createElement('iframe');
+  iframe.id='print-iframe';
+  iframe.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(iframe);
+  const doc=iframe.contentWindow.document;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><title>Field Map</title><style>'+css+'</style></head><body><div class="sheet">'+content+'</div></body></html>');
+  doc.close();
+  // Wait for the iframe to lay out (especially the SVG map) before printing,
+  // then clean up the iframe a few seconds later. iOS doesn't fire onafterprint
+  // reliably, so we use a timeout fallback rather than wait for the event.
+  setTimeout(()=>{
+    try{
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }catch(e){ console.error(e); }
+    setTimeout(()=>{ try{ iframe.remove(); }catch(e){} }, 3000);
+  }, 500);
 }
 function closePrintOverlay(){
   const o=document.getElementById('print-overlay');if(o)o.remove();
