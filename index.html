@@ -14,14 +14,14 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
 .map-wrap{flex:1;position:relative;min-height:0;}
 
 /* Toolbar — three explicit rows that look the same on phone and desktop. */
-.tb{display:flex;flex-direction:column;gap:6px;padding:8px 10px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;z-index:1000;width:100%;box-sizing:border-box;position:relative;touch-action:manipulation;}
+.tb{display:flex;flex-direction:column;gap:4px;padding:5px 8px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;z-index:1000;width:100%;box-sizing:border-box;position:relative;touch-action:manipulation;}
 .tb,.tb *{-webkit-tap-highlight-color:rgba(232,185,49,.25);}
-.tb-row{display:flex;align-items:center;gap:6px;width:100%;}
+.tb-row{display:flex;align-items:center;gap:5px;width:100%;}
 .tb-title{font-weight:800;font-size:13px;color:#e8b931;cursor:pointer;white-space:nowrap;}
 .tb-stat{font-weight:700;font-size:13px;color:#e8b931;}
 .tb-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;}
 .tb-sep{display:none;}
-.tb-btn{padding:8px 14px;border:1px solid #444;border-radius:5px;background:transparent;color:#ccc;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:36px;}
+.tb-btn{padding:5px 11px;border:1px solid #444;border-radius:5px;background:transparent;color:#ccc;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:30px;}
 .tb-btn:hover{background:#2a2d34;color:#fff;}
 .tb-btn.on{background:#e8b931;color:#111;border-color:#e8b931;}
 .tb-sel{padding:4px 6px;background:#222;border:1px solid #444;border-radius:4px;color:#ddd;font-size:10px;font-family:inherit;}
@@ -185,6 +185,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div class="tb-row">
     <button class="tb-btn" onclick="toggleViewMenu()" title="Pick a map coloring view (crop / variety / trait)">Map ▾</button>
     <button class="tb-btn" onclick="toggleMenu()">☰ Menu</button>
+    <button class="tb-btn" onclick="doPDF()" title="Generate a printable map PDF">PDF</button>
     <button class="tb-btn" onclick="viewClear()" title="Clear the current map view">Clear</button>
   </div>
   <div class="tb-row">
@@ -4301,6 +4302,10 @@ function toggleMenu(){
       const r=btn.getBoundingClientRect();
       m.style.top=(r.bottom+4)+'px';
       m.style.right=Math.max(4, (window.innerWidth-r.right))+'px';
+      // Cap the menu height to whatever room is left below the button so it
+      // never spills off the bottom of the phone screen. The dropdown already
+      // sets overflow-y:auto, so scrolling the long menu is fine.
+      m.style.maxHeight=Math.max(160, window.innerHeight - r.bottom - 12)+'px';
     }
     m.style.display='block';
     setTimeout(()=>{document.addEventListener('click',hideMenuOnClick,{once:true});},10);
