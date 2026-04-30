@@ -5012,28 +5012,21 @@ function printOverlayPage(){
   const isMapPage=!!page.querySelector('.map-holder');
   const inner=page.querySelector(':scope > div');
   const content=inner?inner.innerHTML:page.innerHTML;
-  let css='@page{size:letter portrait;margin:0.4in;}'+
+  let css='@page{size:letter portrait;margin:0.35in;}'+
     '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;box-sizing:border-box;}'+
     'html,body{margin:0;padding:0;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;}';
   if(isMapPage){
-    // Map pages: hard-cap to one page. iOS Safari's popup-print pre-paginates
-    // with slightly different metrics than its preview, AND iOS often ignores
-    // the @page margin in popup HTML in favor of the user's Safari setting
-    // (default 0.5in). So in print we use a very conservative 8.7in tall
-    // budget and aggressively suppress page breaks on EVERY element so iOS
-    // can't decide to bump anything to a phantom page 2.
-    css+='html,body{width:100%;height:100vh;overflow:hidden;}'+
-      '.sheet{display:flex;flex-direction:column;width:100%;height:100vh;max-height:9.2in;overflow:hidden;}'+
-      '.sheet>*{flex-shrink:0;}'+
-      '.sheet>.map-holder{flex:1 1 0!important;min-height:0!important;width:100%;overflow:hidden;}'+
-      '.map-holder svg{width:100%;height:100%;max-height:100%;display:block;}'+
-      '@media print{'+
-        '@page{size:letter portrait;margin:0.35in;}'+
-        'html,body{height:8.7in!important;max-height:8.7in!important;overflow:hidden!important;margin:0!important;padding:0!important;}'+
-        'body *{page-break-before:avoid!important;page-break-after:avoid!important;page-break-inside:avoid!important;break-before:avoid!important;break-after:avoid!important;break-inside:avoid!important;}'+
-        '.sheet{height:8.7in!important;max-height:8.7in!important;overflow:hidden!important;display:block!important;margin:0!important;padding:0!important;}'+
-        '.sheet>.map-holder{flex:none!important;height:4.7in!important;max-height:4.7in!important;width:100%!important;overflow:hidden!important;display:block!important;}'+
-      '}';
+    // Map pages: hard-cap to one page using pure absolute inch units. The
+    // iframe is laid out at real letter dimensions (8.5in × 11in, off-screen)
+    // so layout uses the same metrics as print — no flex, no vh, no surprises.
+    // Aggressive page-break:avoid on every child so iOS can't bump anything
+    // onto a phantom page 2.
+    css+='html,body{width:8.5in;height:11in;overflow:hidden;}'+
+      'body *{page-break-before:avoid!important;page-break-after:avoid!important;page-break-inside:avoid!important;break-before:avoid!important;break-after:avoid!important;break-inside:avoid!important;}'+
+      '.sheet{display:block;width:100%;height:9in;max-height:9in;overflow:hidden;margin:0;padding:0;}'+
+      '.sheet>div:first-child{padding:6px 10px 4px;}'+
+      '.map-holder{display:block;width:100%;height:4.5in;max-height:4.5in;overflow:hidden;}'+
+      '.map-holder svg{display:block;width:100%;height:100%;max-height:100%;}';
   }else{
     // Recap pages: allow natural flow; avoid page breaks inside table rows
     css+='.sheet{width:100%;}'+
@@ -5046,12 +5039,14 @@ function printOverlayPage(){
   // user finishes the print/share sheet, so they got stuck on a blank tab
   // and had to nuke the browser. With an iframe the user never leaves the
   // app — the print dialog appears in-place and dismissing it just returns
-  // to the print preview overlay.
+  // to the print preview overlay. Iframe is sized to actual letter dimensions
+  // (8.5in × 11in) and positioned far off-screen so internal layout is real,
+  // not the zero-dimensions a width:0;height:0 iframe would compute.
   const old=document.getElementById('print-iframe');
   if(old) old.remove();
   const iframe=document.createElement('iframe');
   iframe.id='print-iframe';
-  iframe.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  iframe.style.cssText='position:absolute;left:-99999px;top:0;width:8.5in;height:11in;border:0;';
   document.body.appendChild(iframe);
   const doc=iframe.contentWindow.document;
   doc.open();
