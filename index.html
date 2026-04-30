@@ -13,22 +13,15 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
 #map{width:100%;height:100%;position:absolute;top:0;left:0;}
 .map-wrap{flex:1;position:relative;min-height:0;}
 
-/* Toolbar */
-.tb{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;flex-wrap:wrap;z-index:1000;width:100%;box-sizing:border-box;position:relative;touch-action:manipulation;}
+/* Toolbar — three explicit rows that look the same on phone and desktop. */
+.tb{display:flex;flex-direction:column;gap:6px;padding:8px 10px;background:#1a1d24;border-bottom:1px solid #333;flex-shrink:0;z-index:1000;width:100%;box-sizing:border-box;position:relative;touch-action:manipulation;}
 .tb,.tb *{-webkit-tap-highlight-color:rgba(232,185,49,.25);}
-/* Narrow screens (iPhone, small tablets): compress toolbar but keep tap
-   targets at ~36px so fingers reliably hit the buttons. */
-@media (max-width: 700px) {
-  .tb{padding:6px 8px;gap:4px;}
-  .tb-btn{padding:8px 12px;font-size:11px;min-height:36px;}
-  .tb-title{font-size:14px;margin-right:4px;}
-  .tb-sep{display:none;} /* hide divider bars on mobile to save horizontal space */
-}
-.tb-title{font-weight:800;font-size:15px;color:#e8b931;margin-right:6px;cursor:pointer;}
-.tb-stat{font-weight:700;font-size:12px;color:#e8b931;}
-.tb-lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;}
-.tb-sep{width:1px;height:18px;background:#333;margin:0 4px;}
-.tb-btn{padding:4px 10px;border:1px solid #444;border-radius:4px;background:transparent;color:#ccc;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.tb-row{display:flex;align-items:center;gap:6px;width:100%;}
+.tb-title{font-weight:800;font-size:13px;color:#e8b931;cursor:pointer;white-space:nowrap;}
+.tb-stat{font-weight:700;font-size:13px;color:#e8b931;}
+.tb-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;}
+.tb-sep{display:none;}
+.tb-btn{padding:8px 14px;border:1px solid #444;border-radius:5px;background:transparent;color:#ccc;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:36px;}
 .tb-btn:hover{background:#2a2d34;color:#fff;}
 .tb-btn.on{background:#e8b931;color:#111;border-color:#e8b931;}
 .tb-sel{padding:4px 6px;background:#222;border:1px solid #444;border-radius:4px;color:#ddd;font-size:10px;font-family:inherit;}
@@ -180,23 +173,25 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   </div>
 </div>
 
-<!-- Toolbar -->
+<!-- Toolbar — three rows, identical layout on all screen sizes -->
 <div class="tb">
-  <span class="tb-title" onclick="goHome()">🌾 FIELD COMMANDER</span>
-  <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;margin-left:8px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;">Loading…</span>
-  <div class="tb-sep"></div>
-  <span class="tb-stat" id="s-fields">0</span><span class="tb-lbl">fields</span>
-  <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" onclick="toggleViewMenu()" title="Pick a map coloring view (crop / variety / trait)">Map ▾</button>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" onclick="showPanel('pan-edit')" title="Plant your fields — set crop, variety, and plant date">Planting</button>
-  <button class="tb-btn" id="btn-spray" onclick="viewCategory('spray')">Spray</button>
-  <button class="tb-btn" id="btn-fertilizer" onclick="viewCategory('fertilizer')">Fertilizer</button>
-  <button class="tb-btn" onclick="viewClear()" title="Clear the current map view">Clear</button>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" onclick="doPDF()" title="Generate a printable map PDF">PDF</button>
-  <button class="tb-btn" onclick="toggleMenu()">☰ Menu</button>
+  <div class="tb-row">
+    <span class="tb-title" onclick="goHome()">🌾 FIELD COMMANDER</span>
+    <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;">Loading…</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:4px;">
+      <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
+    </span>
+  </div>
+  <div class="tb-row">
+    <button class="tb-btn" onclick="toggleViewMenu()" title="Pick a map coloring view (crop / variety / trait)">Map ▾</button>
+    <button class="tb-btn" onclick="toggleMenu()">☰ Menu</button>
+    <button class="tb-btn" onclick="viewClear()" title="Clear the current map view">Clear</button>
+  </div>
+  <div class="tb-row">
+    <button class="tb-btn" onclick="showPanel('pan-edit')" title="Plant your fields — set crop, variety, and plant date">Planting</button>
+    <button class="tb-btn" id="btn-spray" onclick="viewCategory('spray')">Spray</button>
+    <button class="tb-btn" id="btn-fertilizer" onclick="viewCategory('fertilizer')">Fertilizer</button>
+  </div>
   <!-- Hidden legacy buttons — kept in DOM so existing view functions can still
        getElementById and toggle their .on class without crashing. -->
   <span style="display:none;">
@@ -4396,7 +4391,6 @@ function toggleEventPanel(){
 // === RENDER UI ===
 function renderUI(){
   const ff=filtered(),ta=ff.reduce((s,f)=>s+f.acres,0);
-  document.getElementById('s-fields').textContent=ff.length;
   document.getElementById('s-acres').textContent=ta.toFixed(0);
   const lg=document.getElementById('legend');let h='';
   const sub=getActiveSub();
