@@ -4968,19 +4968,17 @@ function printOverlayPage(){
     '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;box-sizing:border-box;}'+
     'html,body{margin:0;padding:0;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;}';
   if(isMapPage){
-    // Map pages: hard-cap to one page. The legend used to spill onto page 2
-    // because flex:1 1 auto on .map-holder asked the SVG to size to its content
-    // first; switching to flex:1 1 0 makes the map fill purely the leftover
-    // space after siblings. Also adds modern break-inside / clip overflow.
-    // Sheet sized to viewport on screen (so iOS print captures the whole layout
-    // instead of cutting off content past the visible viewport), then locked to
-    // 9.9in for the actual print medium.
+    // Map pages: hard-cap to one page. iOS Safari's popup-print didn't always
+    // honor flex:1 1 0 shrinkage on the map, so the mix block (which now lists
+    // per-product page totals and is taller than before) was getting bumped to
+    // page 2. Lock .map-holder to a fixed inch height in print so the mix and
+    // legend always have a known, predictable amount of room beneath the map.
     css+='html,body{width:100%;height:100vh;overflow:hidden;}'+
       '.sheet{display:flex;flex-direction:column;width:100%;height:100vh;max-height:9.9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
       '.sheet>*{flex-shrink:0;break-inside:avoid;page-break-inside:avoid;}'+
       '.sheet>.map-holder{flex:1 1 0!important;min-height:0!important;width:100%;overflow:hidden;}'+
       '.map-holder svg{width:100%;height:100%;max-height:100%;display:block;}'+
-      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.9in;max-height:9.9in;overflow:hidden;}}';
+      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.9in;max-height:9.9in;overflow:hidden;display:block;}.sheet>.map-holder{flex:none!important;height:5.4in!important;max-height:5.4in!important;width:100%!important;overflow:hidden!important;}}';
   }else{
     // Recap pages: allow natural flow; avoid page breaks inside table rows
     css+='.sheet{width:100%;}'+
@@ -4990,7 +4988,7 @@ function printOverlayPage(){
   }
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Field Map</title><style>'+css+'</style></head><body><div class="sheet">');
   w.document.write(content);
-  w.document.write('</div><script>window.onload=function(){setTimeout(function(){window.print();},150);}<\/script></body></html>');
+  w.document.write('</div><script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script></body></html>');
   w.document.close();
 }
 function closePrintOverlay(){
