@@ -2286,6 +2286,17 @@ function showSprayOrderOverlay(sub,orderFields){
           '</div>';
         });
         cMix+='</div>';
+        if(window._poDrone){
+          cMix+='<div style="margin:4px 0 0 22px;padding:5px 8px;background:#eef6ff;border:1px dashed #4b89c5;border-radius:3px;font-size:11px;color:#1f2d3d;">';
+          cMix+='<div style="font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#3b6ea5;margin-bottom:3px;">🚁 Drone — per 30-gal vat (10 ac)</div>';
+          g.mx.products.forEach(p=>{
+            cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
+              '<span style="flex:1;">'+esc(p.name)+'</span>'+
+              '<span style="font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">'+vatPer10Ac(p.rate,p.unit)+'</span>'+
+            '</div>';
+          });
+          cMix+='</div>';
+        }
       }
       cMix+='</div>';
     });
@@ -2320,11 +2331,15 @@ function showSprayOrderOverlay(sub,orderFields){
   // single-page previews) so the layout doesn't jump.
   const multi=pages.length>1;
   const navDisabled=!multi;
+  // Remember the spray-overlay args so the Drone toggle can re-render this
+  // exact view without losing context.
+  window._lastSprayOverlay = {sub:sub, orderFields:orderFields};
   let tbHTML='<div style="background:#1a1d24;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap;">';
   tbHTML+='<button onclick="closePrintOverlay();" style="padding:8px 14px;border-radius:5px;background:transparent;color:#ccc;border:1px solid #444;font-size:13px;cursor:pointer;font-family:inherit;">✕ Close</button>';
   tbHTML+='<button onclick="poNav(-1);" '+(navDisabled?'disabled':'')+' style="padding:6px 12px;border-radius:5px;background:'+(navDisabled?'#1f242c':'#333')+';color:'+(navDisabled?'#555':'#ccc')+';border:none;font-size:14px;cursor:'+(navDisabled?'default':'pointer')+';">◀</button>';
   tbHTML+='<span id="po-page-label" style="color:#aaa;font-size:11px;min-width:160px;text-align:center;display:inline-block;font-variant-numeric:tabular-nums;">'+esc(pages[0].label)+(multi?' (1/'+pages.length+')':'')+'</span>';
   tbHTML+='<button onclick="poNav(1);" '+(navDisabled?'disabled':'')+' style="padding:6px 12px;border-radius:5px;background:'+(navDisabled?'#1f242c':'#333')+';color:'+(navDisabled?'#555':'#ccc')+';border:none;font-size:14px;cursor:'+(navDisabled?'default':'pointer')+';">▶</button>';
+  tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;margin-left:6px;"><input type="checkbox" id="po-drone" '+(window._poDrone?'checked':'')+' onchange="poToggleDrone()" style="margin:0;"> 🚁 Drone</label>';
   tbHTML+='<button onclick="printOverlayPage();" style="padding:8px 14px;border-radius:5px;background:#e8b931;color:#111;border:none;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🖨️ Print / Save PDF</button>';
   tbHTML+='<span style="margin-left:auto;font-size:9px;color:#666;">or screenshot</span>';
   tbHTML+='</div>';
@@ -2367,6 +2382,24 @@ function pageProductTotal(rate,acres,unit){
   if(u==='qt') return fmt(v/4)+' gal';
   if(u==='pt') return fmt(v/8)+' gal';
   return fmt(v)+' '+raw;
+}
+
+// Drone vat math. Drone sprays 3 gal water/ac, vat holds 30 gal → 10 ac/vat.
+// So each product per vat = 10 × per-acre rate. Display ounces AND gallons for
+// liquid measures (everything but solids like lb).
+function vatPer10Ac(rate,unit){
+  const r=(parseFloat(rate)||0)*10; // 10 acres per 30-gal vat
+  const raw=(unit||'oz/ac').replace(/\/ac$/i,'').trim();
+  const u=raw.toLowerCase();
+  const fmt=n=>n.toLocaleString(undefined,{maximumFractionDigits:n>=10?1:2});
+  let oz=null;
+  if(u==='oz'||u==='fl oz'||u==='floz') oz=r;
+  else if(u==='qt') oz=r*32;
+  else if(u==='pt') oz=r*16;
+  else if(u==='gal') oz=r*128;
+  // Solid measure (lb) — no liquid conversion possible
+  if(oz===null) return fmt(r)+' '+raw;
+  return fmt(oz)+' oz <span style="color:#666;font-weight:500;">('+fmt(oz/128)+' gal)</span>';
 }
 
 // Builds a printable product totals recap for a spray/fertilizer subcategory.
@@ -4690,6 +4723,17 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
           '</div>';
         });
         cMix+='</div>';
+        if(window._poDrone){
+          cMix+='<div style="margin:4px 0 0 22px;padding:5px 8px;background:#eef6ff;border:1px dashed #4b89c5;border-radius:3px;font-size:11px;color:#1f2d3d;">';
+          cMix+='<div style="font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#3b6ea5;margin-bottom:3px;">🚁 Drone — per 30-gal vat (10 ac)</div>';
+          mx.products.forEach(p=>{
+            cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
+              '<span style="flex:1;">'+esc(p.name)+'</span>'+
+              '<span style="font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">'+vatPer10Ac(p.rate,p.unit)+'</span>'+
+            '</div>';
+          });
+          cMix+='</div>';
+        }
       }
       cMix+='</div>';
     });
@@ -4888,6 +4932,12 @@ function showPrintOverlay(){
   // the preview when flipped.
   const initLbl=document.getElementById('chk-labels').checked;
   tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;margin-left:10px;"><input type="checkbox" id="po-labels" '+(initLbl?'checked':'')+' onchange="poToggleLabels()" style="margin:0;"> Labels</label>';
+  // Drone vat-mix toggle — only meaningful when a spray/fert sub is active
+  // (mix products to convert to per-vat amounts). Re-renders on flip.
+  if(sub){
+    window._lastSprayOverlay = null; // generic flow; clear spray-overlay context
+    tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-drone" '+(window._poDrone?'checked':'')+' onchange="poToggleDrone()" style="margin:0;"> 🚁 Drone</label>';
+  }
   tbHTML+='<button onclick="printOverlayPage();" style="padding:8px 14px;border-radius:5px;background:#e8b931;color:#111;border:none;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🖨️ Print / Save PDF</button>';
   tbHTML+='<span style="margin-left:auto;font-size:9px;color:#666;">or screenshot</span>';
   tbHTML+='</div>';
@@ -4993,6 +5043,30 @@ function printOverlayPage(){
 }
 function closePrintOverlay(){
   const o=document.getElementById('print-overlay');if(o)o.remove();
+  window._lastSprayOverlay = null;
+}
+
+// Drone toggle: re-render whichever overlay is open (spray order or generic).
+// Preserves the current page index across the rebuild.
+function poToggleDrone(){
+  const cb=document.getElementById('po-drone');
+  window._poDrone = !!(cb && cb.checked);
+  const idx=window._poPage||0;
+  if(window._lastSprayOverlay){
+    showSprayOrderOverlay(window._lastSprayOverlay.sub, window._lastSprayOverlay.orderFields);
+  } else {
+    showPrintOverlay();
+  }
+  if(idx>=0 && idx<(window._poTotal||0) && idx!==0){
+    const pgs=document.querySelectorAll('.po-page');
+    pgs.forEach(p=>{p.style.display=parseInt(p.dataset.idx)===idx?'block':'none';});
+    window._poPage=idx;
+    const lbl=document.getElementById('po-page-label');
+    if(lbl){
+      const suffix=window._poTotal>1?' ('+(idx+1)+'/'+window._poTotal+')':'';
+      lbl.textContent=(window._poLabels[idx]||'')+suffix;
+    }
+  }
 }
 
 // === INIT ===
