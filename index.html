@@ -5018,17 +5018,18 @@ function printOverlayPage(){
     '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;box-sizing:border-box;}'+
     'html,body{margin:0;padding:0;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;}';
   if(isMapPage){
-    // Map pages: hard-cap to one page. iOS Safari's popup-print didn't always
-    // honor flex:1 1 0 shrinkage on the map, so the mix block (which now lists
-    // per-product page totals and is taller than before) was getting bumped to
-    // page 2. Lock .map-holder to a fixed inch height in print so the mix and
-    // legend always have a known, predictable amount of room beneath the map.
+    // Map pages: hard-cap to one page. iOS Safari's popup-print pre-paginates
+    // with slightly different metrics than its preview; even 1-2px of overflow
+    // triggers a blank trailing page. So in print we lock html/body/.sheet to
+    // a conservative 9.2in tall and force overflow:hidden everywhere — any
+    // overflow gets clipped rather than spilling to page 2. Map is pinned to
+    // 5.0in so the mix block always has a known floor of room beneath it.
     css+='html,body{width:100%;height:100vh;overflow:hidden;}'+
-      '.sheet{display:flex;flex-direction:column;width:100%;height:100vh;max-height:9.9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
+      '.sheet{display:flex;flex-direction:column;width:100%;height:100vh;max-height:9.2in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
       '.sheet>*{flex-shrink:0;break-inside:avoid;page-break-inside:avoid;}'+
       '.sheet>.map-holder{flex:1 1 0!important;min-height:0!important;width:100%;overflow:hidden;}'+
       '.map-holder svg{width:100%;height:100%;max-height:100%;display:block;}'+
-      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.9in;max-height:9.9in;overflow:hidden;display:block;}.sheet>.map-holder{flex:none!important;height:5.4in!important;max-height:5.4in!important;width:100%!important;overflow:hidden!important;}}';
+      '@media print{@page{size:letter portrait;margin:0.35in;}html,body{height:9.2in!important;max-height:9.2in!important;overflow:hidden!important;margin:0!important;padding:0!important;}.sheet{height:9.2in!important;max-height:9.2in!important;overflow:hidden!important;display:block!important;page-break-after:avoid!important;}.sheet>.map-holder{flex:none!important;height:5in!important;max-height:5in!important;width:100%!important;overflow:hidden!important;display:block!important;}}';
   }else{
     // Recap pages: allow natural flow; avoid page breaks inside table rows
     css+='.sheet{width:100%;}'+
