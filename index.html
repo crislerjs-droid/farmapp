@@ -4705,7 +4705,14 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
   let cLeg='',cMix='';
   if(sub){
     // Unified mix cards: swatch + name + acres on header, products indented
-    const isFert=activeCategory==='fertilizer';
+    // Look up which category this sub belongs to from subcategories rather
+    // than trusting the live activeCategory global, which was unreliable in
+    // testing — sub-level lookup is the source of truth.
+    let subCategory=null;
+    for(const cat of Object.keys(subcategories||{})){
+      if((subcategories[cat]||[]).some(s=>s.id===sub.id)){ subCategory=cat; break; }
+    }
+    const isFert=subCategory==='fertilizer';
     sub.mixes.forEach(mx=>{
       const mf=activeFields.filter(f=>mx.fields[f.id]);
       // Spray: skip mixes with no fields on this page (current behavior).
