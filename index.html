@@ -61,7 +61,12 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
   .po-page{page-break-after:avoid!important;position:static!important;width:100%!important;height:auto!important;overflow:hidden!important;}
   /* Force the visible page to a layout that fills the sheet — and cannot spill to a 2nd page */
   .po-page:not([style*="display:none"]):not([style*="display: none"])>div{display:flex!important;flex-direction:column!important;height:10.2in!important;max-height:10.2in!important;padding:0!important;margin:0!important;overflow:hidden!important;}
-  .map-holder{flex:1 1 auto!important;height:auto!important;min-height:0!important;width:100%!important;}
+  /* flex:1 1 0 (NOT auto) so the map's flex-basis is 0 and it grows from
+     scratch to fill leftover space. With basis:auto, the map sized to its
+     intrinsic content (= 0, since height:100% on the SVG can't resolve
+     against an auto-height parent) and never grew, which left the map at
+     a few inches and dumped the rest of the sheet as whitespace. */
+  .map-holder{flex:1 1 0!important;flex-basis:0!important;min-height:0!important;width:100%!important;height:auto!important;}
   .map-holder svg{width:100%!important;height:100%!important;max-height:none!important;}
   #po-pages{overflow:visible!important;position:static!important;height:auto!important;}
   #print-overlay{position:static!important;overflow:visible!important;background:#fff!important;}
