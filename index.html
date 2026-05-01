@@ -4708,11 +4708,23 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
     sub.mixes.forEach(mx=>{
       const mf=activeFields.filter(f=>mx.fields[f.id]);if(!mf.length)return;
       const ac=mf.reduce((s,f)=>s+f.acres,0);
+      // For fertilizer mixes, sum all per-acre lb rates and × acres to show
+      // the combined blended poundage beside the acres on the header. The
+      // blend is mixed by the supplier into a single bag, so the aggregate
+      // is what gets ordered, not the per-product breakdown.
+      let blendLb=0,allLb=true;
+      (mx.products||[]).forEach(p=>{
+        const u=(p.unit||'').toLowerCase().replace(/\/ac$/,'').trim();
+        if(u==='lb'||u==='lbs') blendLb+=(parseFloat(p.rate)||0)*ac;
+        else allLb=false;
+      });
+      const showBlend=activeCategory==='fertilizer'&&allLb&&blendLb>0;
+      const blendLabel=showBlend?' · '+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb':'';
       cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
           '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
-          '<span style="font-size:12px;color:#444;font-weight:600;">'+mf.length+' fld · '+ac.toFixed(0)+' ac</span>'+
+          '<span style="font-size:12px;color:#444;font-weight:600;">'+mf.length+' fld · '+ac.toFixed(0)+' ac'+blendLabel+'</span>'+
         '</div>';
       if(mx.products&&mx.products.length){
         cMix+='<div style="font-size:11.5px;color:#444;padding-left:22px;line-height:1.4;">';
