@@ -4727,27 +4727,29 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
   }
   let cLeg='',cMix='';
   if(sub){
-    // Unified mix cards: swatch + name + acres on header, products indented
-    // Look up which category this sub belongs to from subcategories rather
-    // than trusting the live activeCategory global, which was unreliable in
-    // testing — sub-level lookup is the source of truth.
+    // Determine if this is a "blend" sub (fertilizer): trigger blend mode
+    // when EVERY mix has every product in lb units, OR when the sub belongs
+    // to the fertilizer subcategory. Data-driven check works regardless of
+    // any global state being stale at print time.
     let subCategory=null;
     for(const cat of Object.keys(subcategories||{})){
       if((subcategories[cat]||[]).some(s=>s.id===sub.id)){ subCategory=cat; break; }
     }
-    const isFert=subCategory==='fertilizer';
+    const allMixesLb = (sub.mixes||[]).length>0 && sub.mixes.every(mx =>
+      (mx.products||[]).length>0 && (mx.products||[]).every(p=>{
+        const u=(p.unit||'').toLowerCase().replace(/\/ac$/,'').trim();
+        return u==='lb' || u==='lbs';
+      })
+    );
+    const isFert = subCategory==='fertilizer' || allMixesLb;
     sub.mixes.forEach(mx=>{
       const mf=activeFields.filter(f=>mx.fields[f.id]);
-      // Spray: skip mixes with no fields on this page (current behavior).
-      // Fertilizer: ALWAYS render every mix so both blend legends are
-      // visible on every cluster page, since the user references all of
-      // them when prepping the sheets.
+      // Spray: skip mixes with no fields on this page.
+      // Fertilizer/blend: ALWAYS render every mix so all blend legends are
+      // visible on every cluster page.
       if(!mf.length && !isFert) return;
       const ac=mf.reduce((s,f)=>s+f.acres,0);
-      // For fertilizer mixes, sum all per-acre lb rates × acres → the
-      // combined blended poundage beside the acres. The supplier blends the
-      // products into one bag before delivery, so the aggregate is what
-      // gets ordered, not the per-product split.
+      // Sum per-acre lb rates × cluster acres → combined blend poundage.
       let blendLb=0,allLb=true;
       (mx.products||[]).forEach(p=>{
         const u=(p.unit||'').toLowerCase().replace(/\/ac$/,'').trim();
@@ -4757,7 +4759,7 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
       const showBlend=isFert&&allLb&&blendLb>0;
       let blendLabel='';
       if(mf.length===0) blendLabel=' · <em style="color:#888;font-style:normal;font-weight:500;">not on this map</em>';
-      else if(showBlend) blendLabel=' · '+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb';
+      else if(showBlend) blendLabel=' · <span style="color:#16a34a;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
       cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;'+(mf.length===0?'opacity:.55;':'')+'">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
@@ -4767,8 +4769,8 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
       if(mx.products&&mx.products.length){
         cMix+='<div style="font-size:11.5px;color:#444;padding-left:22px;line-height:1.4;">';
         mx.products.forEach(p=>{
-          // Fertilizer: drop the per-product right-column total (the blend
-          // header carries the only number that matters). Spray: keep it.
+          // Fertilizer/blend: drop the per-product right-column total (the
+          // blend header carries the only number that matters). Spray: keep it.
           const rightTotal=isFert?'':'<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>';
           cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
             '<span style="flex:1;">'+esc(p.name)+' <strong>'+p.rate+'</strong> '+esc(p.unit)+'</span>'+
