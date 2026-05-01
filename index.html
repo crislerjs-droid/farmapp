@@ -2223,13 +2223,47 @@ function sendSprayOrder(){
     if(mx){Object.entries(mx.fields).forEach(([id,ef])=>{if(ef.status==='planned'){const f=F.find(x=>x.id==parseInt(id));if(f)orderFields.push({field:f,mx:mx});}});}
   }
   if(!orderFields.length){alert('Select fields for the spray order, or ensure there are planned fields in the active mix.');return;}
-  // Build the print with these fields highlighted (filled)
-  showSprayOrderOverlay(sub,orderFields);
+  // For fertilizer orders, ask which vendor the blend is coming from so we
+  // can stamp "From [Vendor]" on every map page.
+  let subCategory=null;
+  for(const cat of Object.keys(subcategories||{})){
+    if((subcategories[cat]||[]).some(s=>s.id===sub.id)){ subCategory=cat; break; }
+  }
+  if(subCategory==='fertilizer'){
+    askFertOrderVendor(sub, orderFields);
+    return;
+  }
+  showSprayOrderOverlay(sub,orderFields,'');
 }
 
-function showSprayOrderOverlay(sub,orderFields){
+// Vendor picker modal for fertilizer spray orders. Lists known vendors as
+// large tap targets, plus a "Skip" option if the user doesn't want to label
+// the source. Selection drops the user into the print preview overlay with
+// the chosen vendor stamped on every page.
+function askFertOrderVendor(sub, orderFields){
+  let h='<h3 style="margin:0 0 8px;">Vendor</h3>';
+  h+='<div style="font-size:11px;color:#888;margin-bottom:10px;">Who is this fertilizer blend coming from? It\'ll appear as "From [Vendor]" on every map page.</div>';
+  h+='<div style="display:flex;flex-direction:column;gap:6px;">';
+  (vendors||[]).forEach(v=>{
+    const enc = encodeURIComponent(v);
+    h+='<button class="tb-btn" onclick="closeModal();showSprayOrderOverlay(__pendingFertSub,__pendingFertOrder,decodeURIComponent(\''+enc+'\'));" style="padding:10px 12px;font-size:13px;text-align:left;">🏢 '+esc(v)+'</button>';
+  });
+  h+='<div style="display:flex;gap:6px;margin-top:6px;">';
+  h+='<button class="tb-btn" onclick="closeModal();showSprayOrderOverlay(__pendingFertSub,__pendingFertOrder,\'\');" style="padding:8px 12px;font-size:12px;flex:1;">Skip — no vendor</button>';
+  h+='<button class="tb-btn" onclick="closeModal();" style="padding:8px 12px;font-size:12px;flex:1;color:#888;">Cancel</button>';
+  h+='</div>';
+  h+='</div>';
+  // Stash the order args so the modal buttons can call showSprayOrderOverlay
+  // with the original sub + fields after the user picks a vendor.
+  window.__pendingFertSub = sub;
+  window.__pendingFertOrder = orderFields;
+  showModal(h);
+}
+
+function showSprayOrderOverlay(sub,orderFields,vendor){
   const showLabels=document.getElementById('chk-labels').checked;
   const activeFields=orderFields.map(o=>o.field);
+  vendor = vendor || '';
   // Use renderClusterMap-like logic but force all fields to be filled
   const clusters=clusterFields(activeFields,0.02);
 
@@ -2386,7 +2420,7 @@ function showSprayOrderOverlay(sub,orderFields){
   const navDisabled=!multi;
   // Remember the spray-overlay args so the Drone toggle can re-render this
   // exact view without losing context.
-  window._lastSprayOverlay = {sub:sub, orderFields:orderFields};
+  window._lastSprayOverlay = {sub:sub, orderFields:orderFields, vendor:vendor};
   let tbHTML='<div style="background:#1a1d24;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap;">';
   tbHTML+='<button onclick="closePrintOverlay();" style="padding:8px 14px;border-radius:5px;background:transparent;color:#ccc;border:1px solid #444;font-size:13px;cursor:pointer;font-family:inherit;">✕ Close</button>';
   tbHTML+='<button onclick="poNav(-1);" '+(navDisabled?'disabled':'')+' style="padding:6px 12px;border-radius:5px;background:'+(navDisabled?'#1f242c':'#333')+';color:'+(navDisabled?'#555':'#ccc')+';border:none;font-size:14px;cursor:'+(navDisabled?'default':'pointer')+';">◀</button>';
@@ -2405,7 +2439,7 @@ function showSprayOrderOverlay(sub,orderFields){
       const m=pg.map;
       pagesHTML+='<div style="padding:10px 12px;color:#000;font-family:Segoe UI,sans-serif;">';
       pagesHTML+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">';
-      pagesHTML+='<div><div style="font-size:16px;font-weight:bold;">'+esc(title)+'</div>';
+      pagesHTML+='<div><div style="font-size:16px;font-weight:bold;">'+esc(title)+(vendor?' <span style="font-size:13px;font-weight:700;color:#0a7a39;">— From '+esc(vendor)+'</span>':'')+'</div>';
       pagesHTML+='<div style="font-size:9px;color:#666;">'+new Date().toLocaleDateString()+' — '+esc(m.farmNames)+'</div></div>';
       pagesHTML+='<div style="text-align:right;font-size:10px;"><strong>Twin Lakes Farm II</strong><br>'+m.fieldCount+' Fields · '+m.acres.toFixed(0)+' ac</div></div>';
       pagesHTML+=m.svgStr;
@@ -5163,7 +5197,7 @@ function poToggleDrone(){
   window._poDrone = !!(cb && cb.checked);
   const idx=window._poPage||0;
   if(window._lastSprayOverlay){
-    showSprayOrderOverlay(window._lastSprayOverlay.sub, window._lastSprayOverlay.orderFields);
+    showSprayOrderOverlay(window._lastSprayOverlay.sub, window._lastSprayOverlay.orderFields, window._lastSprayOverlay.vendor||'');
   } else {
     showPrintOverlay();
   }
