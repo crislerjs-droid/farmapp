@@ -53,20 +53,10 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
   /* Force browser to actually print colors (for legend swatches, background panels) */
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
   .po-page svg{max-height:none!important;}
-  /* Hide every preview page that isn't currently displayed. Inline style on
-     hidden pages is `display:none;` (no space) — match both forms to be safe.
-     Without this, the next rule's display:block override would make EVERY
-     page print, not just the visible one. */
-  .po-page[style*="display:none"],.po-page[style*="display: none"]{display:none!important;}
-  .po-page{page-break-after:avoid!important;position:static!important;width:100%!important;height:auto!important;overflow:hidden!important;}
-  /* Force the visible page to a layout that fills the sheet — and cannot spill to a 2nd page */
-  .po-page:not([style*="display:none"]):not([style*="display: none"])>div{display:flex!important;flex-direction:column!important;height:10.2in!important;max-height:10.2in!important;padding:0!important;margin:0!important;overflow:hidden!important;}
-  /* flex:1 1 0 (NOT auto) so the map's flex-basis is 0 and it grows from
-     scratch to fill leftover space. With basis:auto, the map sized to its
-     intrinsic content (= 0, since height:100% on the SVG can't resolve
-     against an auto-height parent) and never grew, which left the map at
-     a few inches and dumped the rest of the sheet as whitespace. */
-  .map-holder{flex:1 1 0!important;flex-basis:0!important;min-height:0!important;width:100%!important;height:auto!important;}
+  .po-page{page-break-after:avoid!important;position:static!important;display:block!important;width:100%!important;height:auto!important;overflow:hidden!important;}
+  /* Force each page to a layout that fills the sheet — and cannot spill to a 2nd page */
+  .po-page>div{display:flex!important;flex-direction:column!important;height:10.2in!important;max-height:10.2in!important;padding:0!important;margin:0!important;overflow:hidden!important;}
+  .map-holder{flex:1 1 auto!important;height:auto!important;min-height:0!important;width:100%!important;}
   .map-holder svg{width:100%!important;height:100%!important;max-height:none!important;}
   #po-pages{overflow:visible!important;position:static!important;height:auto!important;}
   #print-overlay{position:static!important;overflow:visible!important;background:#fff!important;}
@@ -5140,60 +5130,31 @@ function poToggleLabels(){
 function printOverlayPage(){
   const page=document.querySelector('.po-page[style*="display: block"],.po-page:not([style*="display: none"])');
   if(!page)return;
-  // Detect whether current page is a map page (has .map-holder) or a recap page (no map)
+  const w=window.open('','_blank');
+  if(!w){alert('Pop-up blocked. Try screenshot instead.');return;}
   const isMapPage=!!page.querySelector('.map-holder');
   const inner=page.querySelector(':scope > div');
   const content=inner?inner.innerHTML:page.innerHTML;
-  let css='@page{size:letter portrait;margin:0.35in;}'+
+  let css='@page{size:letter portrait;margin:0.4in;}'+
     '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;box-sizing:border-box;}'+
     'html,body{margin:0;padding:0;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;}';
   if(isMapPage){
-    // Map pages: hard-cap to one page using pure absolute inch units. The
-    // iframe is laid out at real letter dimensions (8.5in × 11in, off-screen)
-    // so layout uses the same metrics as print — no flex, no vh, no surprises.
-    // Aggressive page-break:avoid on every child so iOS can't bump anything
-    // onto a phantom page 2.
-    css+='html,body{width:8.5in;height:11in;overflow:hidden;}'+
-      'body *{page-break-before:avoid!important;page-break-after:avoid!important;page-break-inside:avoid!important;break-before:avoid!important;break-after:avoid!important;break-inside:avoid!important;}'+
-      '.sheet{display:block;width:100%;height:9in;max-height:9in;overflow:hidden;margin:0;padding:0;}'+
-      '.sheet>div:first-child{padding:6px 10px 4px;}'+
-      '.map-holder{display:block;width:100%;height:4.5in;max-height:4.5in;overflow:hidden;}'+
-      '.map-holder svg{display:block;width:100%;height:100%;max-height:100%;}';
+    css+='html,body{width:100%;height:100%;overflow:hidden;}'+
+      '.sheet{display:flex;flex-direction:column;width:100%;height:9.9in;max-height:9.9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
+      '.sheet>*{flex-shrink:0;break-inside:avoid;page-break-inside:avoid;}'+
+      '.sheet>.map-holder{flex:1 1 0!important;min-height:0!important;width:100%;overflow:hidden;}'+
+      '.map-holder svg{width:100%;height:100%;max-height:100%;display:block;}'+
+      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.9in;overflow:hidden;}}';
   }else{
-    // Recap pages: allow natural flow; avoid page breaks inside table rows
     css+='.sheet{width:100%;}'+
       'table{page-break-inside:auto;}'+
       'tr{page-break-inside:avoid;page-break-after:auto;}'+
       'thead{display:table-header-group;}';
   }
-  // Print via a hidden iframe instead of a popup window. The popup approach
-  // worked but iOS Safari has no way to auto-close the popup tab after the
-  // user finishes the print/share sheet, so they got stuck on a blank tab
-  // and had to nuke the browser. With an iframe the user never leaves the
-  // app — the print dialog appears in-place and dismissing it just returns
-  // to the print preview overlay. Iframe is sized to actual letter dimensions
-  // (8.5in × 11in) and positioned far off-screen so internal layout is real,
-  // not the zero-dimensions a width:0;height:0 iframe would compute.
-  const old=document.getElementById('print-iframe');
-  if(old) old.remove();
-  const iframe=document.createElement('iframe');
-  iframe.id='print-iframe';
-  iframe.style.cssText='position:absolute;left:-99999px;top:0;width:8.5in;height:11in;border:0;';
-  document.body.appendChild(iframe);
-  const doc=iframe.contentWindow.document;
-  doc.open();
-  doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><title>Field Map</title><style>'+css+'</style></head><body><div class="sheet">'+content+'</div></body></html>');
-  doc.close();
-  // Wait for the iframe to lay out (especially the SVG map) before printing,
-  // then clean up the iframe a few seconds later. iOS doesn't fire onafterprint
-  // reliably, so we use a timeout fallback rather than wait for the event.
-  setTimeout(()=>{
-    try{
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    }catch(e){ console.error(e); }
-    setTimeout(()=>{ try{ iframe.remove(); }catch(e){} }, 3000);
-  }, 500);
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Field Map</title><style>'+css+'</style></head><body><div class="sheet">');
+  w.document.write(content);
+  w.document.write('</div><script>window.onload=function(){setTimeout(function(){window.print();},150);}<\/script></body></html>');
+  w.document.close();
 }
 function closePrintOverlay(){
   const o=document.getElementById('print-overlay');if(o)o.remove();
