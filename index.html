@@ -2288,31 +2288,61 @@ function showSprayOrderOverlay(sub,orderFields){
     if(f.plantDate){const dp=f.plantDate.split('-');svg+='<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" dominant-baseline="alphabetic" font-size="10" font-weight="bold" fill="#222" font-family="sans-serif">P: '+(dp.length===3?dp[1]+'/'+dp[2]+'/'+dp[0].slice(2):f.plantDate)+'</text>';}}});
     const farmNames=[...new Set(clusterActive.map(f=>f.farm).filter(Boolean))].sort().join(', ');
     const totAc=clusterActive.reduce((s,f)=>s+f.acres,0);
-    // Combined mix entries — swatch + name + acres on header row, products indented below
+    // Render every mix in sub.mixes as its own card. Previously this grouped
+    // by mix name, which silently merged two same-named fertilizer mixes
+    // (e.g. "150 Urea Ag with 50 Sulfate" × 2) into a single card with one
+    // mix's products and the combined acres. Iterating sub.mixes directly
+    // by index avoids the merge.
     let cMix='';
-    const mixGroups={};
-    clusterActive.forEach(f=>{const of=orderFields.find(o=>o.field.id===f.id);if(of){const mn=of.mx.name;if(!mixGroups[mn])mixGroups[mn]={mx:of.mx,fields:[]};mixGroups[mn].fields.push(f);}});
-    Object.values(mixGroups).forEach(g=>{
-      const ac=g.fields.reduce((s,f)=>s+f.acres,0);
-      cMix+='<div style="margin-top:6px;padding:6px 10px;border-left:4px solid '+g.mx.color+';background:#fafaf7;">'+
+    let subCategory=null;
+    for(const cat of Object.keys(subcategories||{})){
+      if((subcategories[cat]||[]).some(s=>s.id===sub.id)){ subCategory=cat; break; }
+    }
+    const allMixesLb = (sub.mixes||[]).length>0 && sub.mixes.every(mx =>
+      (mx.products||[]).length>0 && (mx.products||[]).every(p=>{
+        const u=(p.unit||'').toLowerCase().replace(/\/ac.*$/,'').replace(/\/acre.*$/,'').trim();
+        return u==='lb' || u==='lbs' || u==='pound' || u==='pounds';
+      })
+    );
+    const isFert = subCategory==='fertilizer' || allMixesLb;
+    const mixCount = sub.mixes.length;
+    cMix+='<div style="margin-top:4px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;font-weight:700;">'+
+      (isFert?'Fertilizer Blends':'Spray Mixes')+' · '+mixCount+'</div>';
+    sub.mixes.forEach(mx=>{
+      // mf = this mix's fields that are part of this cluster's order
+      const mf=clusterActive.filter(f=>orderFields.some(o=>o.field.id===f.id && o.mx===mx));
+      const ac=mf.reduce((s,f)=>s+f.acres,0);
+      let blendLb=0,allLb=true;
+      (mx.products||[]).forEach(p=>{
+        const u=(p.unit||'').toLowerCase().replace(/\/ac.*$/,'').replace(/\/acre.*$/,'').trim();
+        if(u==='lb'||u==='lbs'||u==='pound'||u==='pounds') blendLb+=(parseFloat(p.rate)||0)*ac;
+        else allLb=false;
+      });
+      const showBlend=isFert&&allLb&&blendLb>0;
+      let blendLabel='';
+      if(mf.length===0) blendLabel=' · <em style="color:#888;font-style:normal;font-weight:500;">not on this map</em>';
+      else if(showBlend) blendLabel=' · <span style="color:#16a34a;font-weight:700;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
+      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;'+(mf.length===0?'opacity:.55;':'')+'">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
-          '<span style="display:inline-block;width:14px;height:14px;background-color:'+g.mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
-          '<strong style="font-size:12px;color:#111;">'+esc(g.mx.name)+'</strong>'+
-          '<span style="font-size:11px;color:#444;font-weight:600;">'+g.fields.length+' fld · '+ac.toFixed(0)+' ac</span>'+
+          '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
+          '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
+          '<span style="font-size:12px;color:#444;font-weight:600;">'+mf.length+' fld · '+ac.toFixed(0)+' ac'+blendLabel+'</span>'+
         '</div>';
-      if(g.mx.products&&g.mx.products.length){
+      if(mx.products&&mx.products.length){
         cMix+='<div style="font-size:11.5px;color:#444;padding-left:22px;line-height:1.4;">';
-        g.mx.products.forEach(p=>{
+        mx.products.forEach(p=>{
+          // Fertilizer: drop right-column per-product total. Spray: keep it.
+          const rightTotal=isFert?'':'<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>';
           cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
             '<span style="flex:1;">'+esc(p.name)+' <strong>'+p.rate+'</strong> '+esc(p.unit)+'</span>'+
-            '<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>'+
+            rightTotal+
           '</div>';
         });
         cMix+='</div>';
-        if(window._poDrone){
+        if(window._poDrone && !isFert){
           cMix+='<div style="margin:4px 0 0 22px;padding:5px 8px;background:#eef6ff;border:1px dashed #4b89c5;border-radius:3px;font-size:11px;color:#1f2d3d;">';
           cMix+='<div style="font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#3b6ea5;margin-bottom:3px;">🚁 Drone — per 30-gal vat (10 ac)</div>';
-          g.mx.products.forEach(p=>{
+          mx.products.forEach(p=>{
             cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
               '<span style="flex:1;">'+esc(p.name)+'</span>'+
               '<span style="font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">'+vatPer10Ac(p.rate,p.unit)+'</span>'+
