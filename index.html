@@ -4705,22 +4705,30 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
   let cLeg='',cMix='';
   if(sub){
     // Unified mix cards: swatch + name + acres on header, products indented
+    const isFert=activeCategory==='fertilizer';
     sub.mixes.forEach(mx=>{
-      const mf=activeFields.filter(f=>mx.fields[f.id]);if(!mf.length)return;
+      const mf=activeFields.filter(f=>mx.fields[f.id]);
+      // Spray: skip mixes with no fields on this page (current behavior).
+      // Fertilizer: ALWAYS render every mix so both blend legends are
+      // visible on every cluster page, since the user references all of
+      // them when prepping the sheets.
+      if(!mf.length && !isFert) return;
       const ac=mf.reduce((s,f)=>s+f.acres,0);
-      // For fertilizer mixes, sum all per-acre lb rates and × acres to show
-      // the combined blended poundage beside the acres on the header. The
-      // blend is mixed by the supplier into a single bag, so the aggregate
-      // is what gets ordered, not the per-product breakdown.
+      // For fertilizer mixes, sum all per-acre lb rates × acres → the
+      // combined blended poundage beside the acres. The supplier blends the
+      // products into one bag before delivery, so the aggregate is what
+      // gets ordered, not the per-product split.
       let blendLb=0,allLb=true;
       (mx.products||[]).forEach(p=>{
         const u=(p.unit||'').toLowerCase().replace(/\/ac$/,'').trim();
         if(u==='lb'||u==='lbs') blendLb+=(parseFloat(p.rate)||0)*ac;
         else allLb=false;
       });
-      const showBlend=activeCategory==='fertilizer'&&allLb&&blendLb>0;
-      const blendLabel=showBlend?' · '+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb':'';
-      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
+      const showBlend=isFert&&allLb&&blendLb>0;
+      let blendLabel='';
+      if(mf.length===0) blendLabel=' · <em style="color:#888;font-style:normal;font-weight:500;">not on this map</em>';
+      else if(showBlend) blendLabel=' · '+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb';
+      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;'+(mf.length===0?'opacity:.55;':'')+'">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
           '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
@@ -4729,9 +4737,12 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
       if(mx.products&&mx.products.length){
         cMix+='<div style="font-size:11.5px;color:#444;padding-left:22px;line-height:1.4;">';
         mx.products.forEach(p=>{
+          // Fertilizer: drop the per-product right-column total (the blend
+          // header carries the only number that matters). Spray: keep it.
+          const rightTotal=isFert?'':'<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>';
           cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
             '<span style="flex:1;">'+esc(p.name)+' <strong>'+p.rate+'</strong> '+esc(p.unit)+'</span>'+
-            '<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>'+
+            rightTotal+
           '</div>';
         });
         cMix+='</div>';
