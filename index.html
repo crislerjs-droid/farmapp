@@ -4742,12 +4742,14 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
       })
     );
     const isFert = subCategory==='fertilizer' || allMixesLb;
+    // Mix with at least one field assigned ANYWHERE in the sub (regardless
+    // of whether those fields land on this cluster) gets a card. This
+    // guarantees both legends show whenever the user has multiple mixes
+    // configured — fixes the "only one mix shows in the legend" complaint.
     sub.mixes.forEach(mx=>{
+      const totalFids=Object.keys(mx.fields||{});
+      if(!totalFids.length) return; // empty mix, nothing to legend
       const mf=activeFields.filter(f=>mx.fields[f.id]);
-      // Spray: skip mixes with no fields on this page.
-      // Fertilizer/blend: ALWAYS render every mix so all blend legends are
-      // visible on every cluster page.
-      if(!mf.length && !isFert) return;
       const ac=mf.reduce((s,f)=>s+f.acres,0);
       // Sum per-acre lb rates × cluster acres → combined blend poundage.
       let blendLb=0,allLb=true;
