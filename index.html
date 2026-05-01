@@ -53,9 +53,14 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
   /* Force browser to actually print colors (for legend swatches, background panels) */
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
   .po-page svg{max-height:none!important;}
-  .po-page{page-break-after:avoid!important;position:static!important;display:block!important;width:100%!important;height:auto!important;overflow:hidden!important;}
-  /* Force each page to a layout that fills the sheet — and cannot spill to a 2nd page */
-  .po-page>div{display:flex!important;flex-direction:column!important;height:10.2in!important;max-height:10.2in!important;padding:0!important;margin:0!important;overflow:hidden!important;}
+  /* Hide every preview page that isn't currently displayed. Inline style on
+     hidden pages is `display:none;` (no space) — match both forms to be safe.
+     Without this, the next rule's display:block override would make EVERY
+     page print, not just the visible one. */
+  .po-page[style*="display:none"],.po-page[style*="display: none"]{display:none!important;}
+  .po-page{page-break-after:avoid!important;position:static!important;width:100%!important;height:auto!important;overflow:hidden!important;}
+  /* Force the visible page to a layout that fills the sheet — and cannot spill to a 2nd page */
+  .po-page:not([style*="display:none"]):not([style*="display: none"])>div{display:flex!important;flex-direction:column!important;height:10.2in!important;max-height:10.2in!important;padding:0!important;margin:0!important;overflow:hidden!important;}
   .map-holder{flex:1 1 auto!important;height:auto!important;min-height:0!important;width:100%!important;}
   .map-holder svg{width:100%!important;height:100%!important;max-height:none!important;}
   #po-pages{overflow:visible!important;position:static!important;height:auto!important;}
