@@ -1207,6 +1207,22 @@ function toggleSel(id){
 function deselAll(){sel.clear();editId=null;restyle();renderUI();renderEventPanel();
   if(document.getElementById('pan-programs').classList.contains('show'))renderProgramPanel();
   hidePanel('pan-edit');}
+
+// Select all fields assigned to a given mix in the current sub. Replaces the
+// current selection; sets that mix as the active one so any per-mix UI
+// (assign target, mark-complete form) lines up with what the user just
+// selected. Same action whether the user is in spray or fertilizer.
+function selectMixFields(mixIdx){
+  const sub=getActiveSub();if(!sub)return;
+  const mx=sub.mixes[mixIdx];if(!mx)return;
+  const ids=Object.keys(mx.fields).map(id=>parseInt(id)).filter(id=>F.find(x=>x.id===id));
+  if(!ids.length){alert('This mix has no fields assigned yet.');return;}
+  sel.clear();
+  ids.forEach(id=>sel.add(id));
+  editId=null;
+  activeMixIdx=mixIdx;
+  restyle();renderUI();renderEventPanel();
+}
 const SEL_COLORS=['#EF4444','#3B82F6','#F59E0B','#8B5CF6','#10B981','#EC4899','#06B6D4','#F97316','#e8b931'];
 function cycleSelColor(){
   const idx=SEL_COLORS.indexOf(selColor);
@@ -1414,11 +1430,12 @@ function renderEventPanel(){
     if(fids.length){
       const expandKey=sub.id+':'+mx.id;
       const expanded=__mixExpanded.has(expandKey);
-      h+='<div style="padding:4px 0 0 20px;font-size:10px;color:#aaa;" onclick="event.stopPropagation();">';
+      h+='<div style="padding:4px 0 0 20px;font-size:10px;color:#aaa;display:flex;align-items:center;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation();">';
       h+='<span style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation();toggleMixFields(\''+expandKey+'\');" title="Show/hide assigned fields">';
       h+='<span style="display:inline-block;width:12px;text-align:center;color:#888;font-weight:700;font-size:12px;">'+(expanded?'−':'+')+'</span>';
       h+='<span>Fields ('+fids.length+')</span>';
       h+='</span>';
+      h+='<button class="tb-btn" onclick="event.stopPropagation();selectMixFields('+i+');" style="padding:1px 7px;font-size:9px;line-height:1.4;color:#e8b931;border-color:#e8b931;" title="Select all of this mix\'s fields on the map">⊕ Select All</button>';
       if(expanded){
         const sortedFids=fids.slice().sort((a,b)=>{
           const ea=mx.fields[a],eb=mx.fields[b];
