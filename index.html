@@ -5139,16 +5139,15 @@ function printOverlayPage(){
     '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;box-sizing:border-box;}'+
     'html,body{margin:0;padding:0;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;}';
   if(isMapPage){
-    // Sheet at 9.4in (down from 9.9in) leaves a 0.5in buffer for iPhone Safari,
-    // which silently pads @page margin past the 0.4in we ask for and was
-    // tipping content onto a second page. Desktop still gets a full-bleed
-    // map because the flex chain expands map-holder to fill the sheet.
+    // Sheet at 9.0in for iPhone print margin tolerance — iOS Safari treats
+    // the @page margin as a floor, not a ceiling, and was still spilling
+    // onto page 2 at 9.4in. Desktop still flex-fills the map.
     css+='html,body{width:100%;height:100%;overflow:hidden;}'+
-      '.sheet{display:flex;flex-direction:column;width:100%;height:9.4in;max-height:9.4in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
+      '.sheet{display:flex;flex-direction:column;width:100%;height:9in;max-height:9in;overflow:hidden;page-break-after:avoid;page-break-inside:avoid;break-after:avoid;break-inside:avoid;}'+
       '.sheet>*{flex-shrink:0;break-inside:avoid;page-break-inside:avoid;}'+
       '.sheet>.map-holder{flex:1 1 0!important;min-height:0!important;width:100%;overflow:hidden;}'+
       '.map-holder svg{width:100%;height:100%;max-height:100%;display:block;}'+
-      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9.4in;overflow:hidden;}}';
+      '@media print{html,body{height:auto;overflow:hidden;}.sheet{height:9in;overflow:hidden;}}';
   }else{
     css+='.sheet{width:100%;}'+
       'table{page-break-inside:auto;}'+
