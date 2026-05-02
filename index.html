@@ -187,7 +187,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
     </span>
   </div>
   <div class="tb-row">
-    <button class="tb-btn" onclick="showPanel('pan-edit')" title="Plant your fields — set crop, variety, and plant date">Planting</button>
+    <button class="tb-btn" id="btn-planting" onclick="togglePlanting()" title="Crop / variety / trait / program views — tap again to clear">Planting ▾</button>
     <button class="tb-btn" id="btn-spray" onclick="viewCategory('spray')">Spray</button>
     <button class="tb-btn" id="btn-fertilizer" onclick="viewCategory('fertilizer')">Fertilizer</button>
   </div>
@@ -231,7 +231,6 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 <!-- Dropdown menu -->
 <div id="tb-menu" style="display:none;position:fixed;top:auto;left:8px;z-index:10001;background:rgba(20,22,28,.97);border:1px solid #444;border-radius:6px;padding:6px 0;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:200px;max-height:calc(100vh - 60px);overflow-y:auto;">
   <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">View / Print</div>
-  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="hideMenu();toggleViewMenu();">🗺️ Map View ▾</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="doPDF();hideMenu();">📄 PDF</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="doPrint();hideMenu();">🖨️ Print</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="showPanel('pan-inventory');hideMenu();">📦 Inventory</div>
@@ -1252,6 +1251,7 @@ function viewCrop(){mode='crop';varCrop='';traitCrop='';programCrop='';activeCat
   document.getElementById('btn-var').textContent='Variety ▾';
   document.getElementById('btn-trait').textContent='Trait ▾';
   clearCatButtons();document.getElementById('btn-crop').classList.add('on');
+  const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
   hidePanel('pan-event');renderPills();draw();renderUI();}
 function viewVarietyPick(){
   document.getElementById('trait-pick').style.display='none';
@@ -1267,6 +1267,7 @@ function viewVariety(crop){
   document.getElementById('btn-trait').textContent='Trait ▾';
   clearCatButtons();document.getElementById('btn-var').classList.add('on');
   document.getElementById('btn-var').textContent=crop+' Varieties ▾';
+  const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
   hidePanel('pan-event');renderPills();draw();renderUI();
 }
 // Herbicide trait view: colors fields by what chemistry family their variety tolerates
@@ -1286,17 +1287,22 @@ function viewTrait(crop){
   document.getElementById('btn-var').textContent='Variety ▾';
   clearCatButtons();document.getElementById('btn-trait').classList.add('on');
   document.getElementById('btn-trait').textContent=crop+' Traits ▾';
+  const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
   hidePanel('pan-event');renderPills();draw();renderUI();
 }
 // Program view: colors fields by which growing program they're enrolled in
 // for the selected crop. Programs are user-defined per crop.
 function viewProgram(crop){
   if(!crop)return;programCrop=crop;varCrop='';traitCrop='';mode='program';activeCategory=null;activeSubId=null;activeMixIdx=0;
+  clearCatButtons();
+  const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
   hidePanel('pan-event');renderPills();draw();renderUI();
 }
 function clearCatButtons(){document.querySelectorAll('.tb-btn').forEach(b=>b.classList.remove('on'));}
 
 function viewCategory(cat){
+  // Tap the active category button again to close it out.
+  if(activeCategory===cat){ viewClear(); return; }
   mode='event';activeCategory=cat;activeSubId=null;activeMixIdx=0;
   // Reset to crop-picker view: user picks a crop first, then drills into events.
   activeCropFilter=null;
@@ -1305,6 +1311,17 @@ function viewCategory(cat){
   const btn=document.getElementById('btn-'+cat);if(btn)btn.classList.add('on');
   hidePanel('pan-event');
   renderPills();draw();renderUI();
+}
+
+// Planting button = the old Map ▾ dropdown (Crop Map / Variety / Trait /
+// Program). Tap to open the picker; tap again while a planting view is
+// active to clear it.
+function togglePlanting(){
+  if(mode==='crop'||mode==='variety'||mode==='trait'||mode==='program'){
+    viewClear();
+    return;
+  }
+  toggleViewMenu();
 }
 function selectSub(subId){
   activeSubId=subId;activeMixIdx=0;
