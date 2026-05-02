@@ -176,19 +176,15 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 <!-- Toolbar — three rows, identical layout on all screen sizes -->
 <div class="tb">
   <div class="tb-row">
-    <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw;">Loading…</span>
-    <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+    <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50vw;">Loading…</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:6px;">
       <span style="display:flex;align-items:center;gap:4px;">
         <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
       </span>
+      <button class="tb-btn" onclick="viewClear()" title="Clear the current map view">Clear</button>
+      <button class="tb-btn" onclick="toggleMenu()">☰ Menu</button>
       <button class="tb-btn" onclick="hardReload()" title="Force a fresh reload from the server (clears cache)" style="padding:4px 8px;min-height:28px;font-size:13px;line-height:1;">↻</button>
     </span>
-  </div>
-  <div class="tb-row">
-    <button class="tb-btn" onclick="toggleViewMenu()" title="Pick a map coloring view (crop / variety / trait)">Map ▾</button>
-    <button class="tb-btn" onclick="toggleMenu()">☰ Menu</button>
-    <button class="tb-btn" onclick="doPDF()" title="Generate a printable map PDF">PDF</button>
-    <button class="tb-btn" onclick="viewClear()" title="Clear the current map view">Clear</button>
   </div>
   <div class="tb-row">
     <button class="tb-btn" onclick="showPanel('pan-edit')" title="Plant your fields — set crop, variety, and plant date">Planting</button>
@@ -235,6 +231,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 <!-- Dropdown menu -->
 <div id="tb-menu" style="display:none;position:fixed;top:auto;left:8px;z-index:10001;background:rgba(20,22,28,.97);border:1px solid #444;border-radius:6px;padding:6px 0;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:200px;max-height:calc(100vh - 60px);overflow-y:auto;">
   <div style="padding:4px 14px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.5px;">View / Print</div>
+  <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="hideMenu();toggleViewMenu();">🗺️ Map View ▾</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="doPDF();hideMenu();">📄 PDF</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="doPrint();hideMenu();">🖨️ Print</div>
   <div style="padding:6px 14px;font-size:11px;color:#ccc;cursor:pointer;" onclick="showPanel('pan-inventory');hideMenu();">📦 Inventory</div>
@@ -4503,7 +4500,11 @@ function toggleViewMenu(){
         pp.innerHTML='<option value="">— Pick crop —</option>'+programmable.map(c=>'<option value="'+c+'"'+(c===programCrop?' selected':'')+'>'+c+'</option>').join('');
       }
     }
-    const btn=document.querySelector('[onclick="toggleViewMenu()"]');
+    // Map ▾ used to be a toolbar button; now it's reached via the ☰ Menu.
+    // Anchor the dropdown under the ☰ Menu button so it lines up with where
+    // the user just clicked from.
+    const btn=document.querySelector('[onclick="toggleViewMenu()"]')
+            || document.querySelector('[onclick="toggleMenu()"]');
     if(btn){
       const r=btn.getBoundingClientRect();
       m.style.top=(r.bottom+4)+'px';
