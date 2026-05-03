@@ -1435,7 +1435,17 @@ function renderEventPanel(){
   sub.mixes.forEach((mx,i)=>{
     const fids=Object.keys(mx.fields);
     const mac=fids.reduce((s,id)=>{const f=F.find(x=>x.id==id);return s+(f?f.acres:0);},0);
-    const applied=fids.filter(id=>mx.fields[id].status==='applied').length;
+    const appliedAc=fids.reduce((s,id)=>{
+      const ef=mx.fields[id]; if(!ef||ef.status!=='applied') return s;
+      const f=F.find(x=>x.id==id); return s+(f?f.acres:0);
+    },0);
+    const remainingAc=Math.max(0,mac-appliedAc);
+    const remainingLabel = mac===0 ? 'no fields'
+      : remainingAc===0 ? 'all done ✓'
+      : remainingAc.toFixed(0)+' ac left';
+    const remainingColor = mac===0 ? '#666'
+      : remainingAc===0 ? '#22c55e'
+      : '#888';
     h+='<div style="border:1px solid '+(i===activeMixIdx?mx.color:'#444')+';border-radius:5px;padding:5px 6px;margin-bottom:3px;'
       +(i===activeMixIdx?'background:rgba(255,255,255,.04);':'')+'cursor:pointer;" onclick="activeMixIdx='+i+';renderEventPanel();restyle();renderUI();">';
     h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">';
@@ -1444,9 +1454,12 @@ function renderEventPanel(){
     h+='<input class="tb-input" value="'+esc(mx.name)+'" style="flex:1;min-width:0;font-weight:700;padding:2px 5px;" onchange="getActiveSub().mixes['+i+'].name=this.value;save();renderPills();" onclick="event.stopPropagation();">';
     h+='</div>';
     h+='<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">';
-    h+='<span style="font-size:10px;color:'+mx.color+';font-weight:700;white-space:nowrap;">'+mac.toFixed(0)+'ac·'+fids.length+'fld';
-    if(applied>0)h+=' <span style="color:#22c55e;">'+applied+'✓</span>';
-    h+='</span>';
+    // Stack total acres above the remaining-acres line; drop the field count
+    // and applied-count chips since "remaining" already conveys that.
+    h+='<div style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;white-space:nowrap;">'
+      +'<span style="font-size:11px;color:'+mx.color+';font-weight:700;">'+mac.toFixed(0)+' ac</span>'
+      +'<span style="font-size:9px;color:'+remainingColor+';font-weight:600;">'+remainingLabel+'</span>'
+      +'</div>';
     h+='<button class="tb-btn" onclick="event.stopPropagation();editMixModal('+i+');" style="padding:1px 5px;font-size:9px;flex-shrink:0;" title="Edit mix">✏️</button>';
     h+='<button class="tb-btn" onclick="event.stopPropagation();removeMix('+i+');" style="padding:1px 5px;font-size:9px;color:#ef4444;border-color:#ef4444;flex-shrink:0;" title="Delete mix">✕</button>';
     h+='</div></div>';
