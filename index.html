@@ -1563,7 +1563,7 @@ function renderEventPanel(){
       +'<span style="font-size:11px;color:'+mx.color+';font-weight:700;">'+mac.toFixed(0)+' ac</span>'
       +'<span style="font-size:9px;color:'+remainingColor+';font-weight:600;">'+remainingLabel+'</span>'
       +'</div>';
-    h+='<button class="tb-btn" onclick="event.stopPropagation();editMixModal('+i+');" style="padding:1px 5px;font-size:9px;flex-shrink:0;" title="Edit mix (delete is in the editor)">✏️</button>';
+    h+='<button class="tb-btn" onclick="editMixModal('+i+');" style="padding:1px 5px;font-size:9px;flex-shrink:0;" title="Edit mix (delete is in the editor)">✏️</button>';
     h+='</div></div>';
     // Products — uniform weight (no bold rate) for consistent look across the
     // mix. NO stopPropagation here so tapping the product list also activates
@@ -1573,10 +1573,11 @@ function renderEventPanel(){
       mx.products.forEach(p=>{h+=esc(p.name)+' '+p.rate+' '+esc(p.unit)+'<br>';});
       h+='</div>';
     }
-    // Select All — small plain button, same family as the footer actions.
+    // Select All — small plain button. No stopPropagation so clicking the
+    // button area also bubbles to the card and activates the mix.
     if(fids.length){
-      h+='<div style="padding:3px 0 0 20px;" onclick="event.stopPropagation();">'
-        +'<button class="tb-btn" onclick="event.stopPropagation();selectMixFields('+i+');" style="font-size:8px;padding:2px 6px;min-height:0;line-height:1.2;" title="Add all of this mix\'s fields to the current map selection">Select All</button>'
+      h+='<div style="padding:3px 0 0 20px;">'
+        +'<button class="tb-btn" onclick="selectMixFields('+i+');" style="font-size:8px;padding:2px 6px;min-height:0;line-height:1.2;" title="Add all of this mix\'s fields to the current map selection">Select All</button>'
         +'</div>';
     }
     // Notes — only render the textarea if there's an existing note. Otherwise
