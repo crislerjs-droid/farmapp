@@ -73,6 +73,11 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
 .fp-row{display:flex;gap:6px;margin-bottom:6px;align-items:center;}
 .fp-close{position:absolute;top:8px;right:10px;background:none;border:none;color:#888;font-size:14px;cursor:pointer;}
 .fp-close:hover{color:#fff;}
+/* Drag handle bar at the top of each panel — grab to move the whole panel.
+   Positioned absolutely so the panel's own padding isn't pushed down. */
+.fp-drag{position:absolute;top:0;left:0;right:0;height:14px;cursor:move;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;letter-spacing:2px;user-select:none;touch-action:none;background:rgba(0,0,0,.15);border-radius:8px 8px 0 0;}
+.fp-drag:hover{color:#888;}
+.fpanel{padding-top:18px!important;}
 textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;border-radius:4px;color:#ddd;font-size:11px;font-family:inherit;min-height:70px;resize:vertical;}
 
 /* Map buttons */
@@ -279,6 +284,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 
 <!-- Planting panel — view modes + selected-field editor + batch editor -->
 <div id="pan-edit" class="fpanel" style="width:340px;">
+  <div class="fp-drag" title="Drag to move">⋯⋯⋯</div>
   <button class="fp-close" onclick="hidePanel('pan-edit')">✕</button>
   <div class="fp-title">Planting</div>
 
@@ -346,6 +352,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 
 <!-- Event Detail panel - content rendered dynamically -->
 <div id="pan-event" class="fpanel" style="width:min(360px,72vw);">
+  <div class="fp-drag" title="Drag to move">⋯⋯⋯</div>
   <div id="ev-expand-btn" onclick="expandEventPanel();" style="display:none;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;color:#e8b931;text-align:center;">◀ Open Panel</div>
   <button class="fp-close" onclick="hidePanel('pan-event')" style="right:28px;">✕</button>
   <button class="fp-close" onclick="collapseEventPanel();" style="right:8px;font-size:10px;" title="Collapse">▶</button>
@@ -354,6 +361,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 
 <!-- Inventory panel -->
 <div id="pan-inventory" class="fpanel" style="width:380px;">
+  <div class="fp-drag" title="Drag to move">⋯⋯⋯</div>
   <button class="fp-close" onclick="hidePanel('pan-inventory')">✕</button>
   <div class="fp-title">Inventory</div>
   <div class="fp-row" style="margin-bottom:8px;">
@@ -370,6 +378,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 </div>
 
 <div id="pan-traits" class="fpanel" style="width:420px;">
+  <div class="fp-drag" title="Drag to move">⋯⋯⋯</div>
   <button class="fp-close" onclick="hidePanel('pan-traits')">✕</button>
   <div class="fp-title">Herbicide Traits</div>
   <div style="font-size:10px;color:#aaa;margin-bottom:10px;line-height:1.4;">
@@ -379,6 +388,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 </div>
 
 <div id="pan-programs" class="fpanel" style="width:380px;">
+  <div class="fp-drag" title="Drag to move">⋯⋯⋯</div>
   <button class="fp-close" onclick="hidePanel('pan-programs')">✕</button>
   <div id="programs-content"></div>
 </div>
@@ -1438,14 +1448,20 @@ function renderPills(){
   if(activeCropFilter){
     const subs=(subcategories[activeCategory]||[]).filter(s=>s.crop===activeCropFilter);
     h+='<div style="display:flex;gap:4px;flex-wrap:wrap;width:100%;margin-top:3px;border-top:1px dashed #2a2d34;padding-top:3px;">';
-    subs.forEach(sub=>{
+    subs.forEach((sub,subVisIdx)=>{
       let totalFields=0,totalApplied=0;
       sub.mixes.forEach(mx=>{const fids=Object.keys(mx.fields);totalFields+=fids.length;totalApplied+=fids.filter(id=>mx.fields[id].status==='applied').length;});
       const statusColor=totalFields===0?'#666':totalApplied===totalFields?'#22c55e':totalApplied>0?'#f59e0b':'#3b82f6';
-      h+='<button class="pill'+(activeSubId===sub.id?' active':'')+'" onclick="selectSub('+sub.id+')">';
+      const canLeft=subVisIdx>0, canRight=subVisIdx<subs.length-1;
+      h+='<button class="pill'+(activeSubId===sub.id?' active':'')+'" onclick="selectSub('+sub.id+')" style="display:inline-flex;align-items:center;gap:0;padding:0;">';
+      // Reorder arrow — swap with the previous same-crop pill in this row
+      h+='<span onclick="event.stopPropagation();moveSubPill('+sub.id+',-1)" style="padding:4px 5px;color:'+(canLeft?'#aaa':'#444')+';cursor:'+(canLeft?'pointer':'default')+';font-size:11px;line-height:1;" title="Move left">‹</span>';
+      h+='<span style="padding:4px 4px;display:inline-flex;align-items:center;gap:4px;">';
       h+='<span class="pill-status" style="background:'+statusColor+';"></span>';
       h+=esc(sub.name);
       if(totalFields>0)h+=' <span style="opacity:.6;font-size:9px;">('+totalApplied+'/'+totalFields+')</span>';
+      h+='</span>';
+      h+='<span onclick="event.stopPropagation();moveSubPill('+sub.id+',1)" style="padding:4px 5px;color:'+(canRight?'#aaa':'#444')+';cursor:'+(canRight?'pointer':'default')+';font-size:11px;line-height:1;" title="Move right">›</span>';
       h+='</button>';
     });
     h+='<button class="pill add-pill" onclick="createSubModal()">+ New '+esc(activeCropFilter)+' Event</button>';
@@ -1453,6 +1469,27 @@ function renderPills(){
   }
   cont.innerHTML=h;
 }
+// Move a sub pill one slot left (-1) or right (+1) within its crop row.
+// Reorders the underlying subcategories[activeCategory] array, swapping
+// with the closest sub of the same crop so other crops' positions don't
+// shift unexpectedly.
+function moveSubPill(subId, dir){
+  const arr = subcategories[activeCategory] || [];
+  const idx = arr.findIndex(s=>s.id===subId);
+  if(idx<0) return;
+  const sub = arr[idx];
+  let targetIdx = -1;
+  if(dir<0){
+    for(let i=idx-1; i>=0; i--){ if(arr[i].crop===sub.crop){ targetIdx=i; break; } }
+  } else {
+    for(let i=idx+1; i<arr.length; i++){ if(arr[i].crop===sub.crop){ targetIdx=i; break; } }
+  }
+  if(targetIdx<0) return;
+  arr.splice(idx,1);
+  arr.splice(targetIdx,0,sub);
+  save(); renderPills();
+}
+
 function selectCropFilter(crop){
   // Tap the active crop pill again to clear it.
   if(activeCropFilter===crop){
@@ -5278,8 +5315,46 @@ function poToggleDrone(){
 
 // === INIT ===
 function boot(){F.forEach(f=>ensureColors(f));seedTraitGuesses();popFilters();popVar();draw();fitAll();renderUI();renderPills();save();}
+
+// Make every floating panel draggable by its top handle bar. Single pointer
+// listener set covers both mouse and touch via Pointer Events.
+function initPanelDragging(){
+  document.querySelectorAll('.fpanel').forEach(panel=>{
+    const handle=panel.querySelector('.fp-drag');
+    if(!handle) return;
+    let dragging=false, startX=0, startY=0, panelStartX=0, panelStartY=0;
+    handle.addEventListener('pointerdown', e=>{
+      dragging=true;
+      const r=panel.getBoundingClientRect();
+      startX=e.clientX; startY=e.clientY;
+      panelStartX=r.left; panelStartY=r.top;
+      // Convert from right-anchored CSS to absolute left/top so the drag math works.
+      panel.style.left=panelStartX+'px';
+      panel.style.top=panelStartY+'px';
+      panel.style.right='auto';
+      panel.style.bottom='auto';
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    handle.addEventListener('pointermove', e=>{
+      if(!dragging) return;
+      const dx=e.clientX-startX, dy=e.clientY-startY;
+      // Clamp so the panel can't be dragged completely off-screen.
+      const w=panel.offsetWidth, h=panel.offsetHeight;
+      const nx=Math.max(-w+60, Math.min(window.innerWidth-60, panelStartX+dx));
+      const ny=Math.max(0, Math.min(window.innerHeight-30, panelStartY+dy));
+      panel.style.left=nx+'px';
+      panel.style.top=ny+'px';
+    });
+    const stop = e=>{ dragging=false; try{ handle.releasePointerCapture(e.pointerId); }catch(_){} };
+    handle.addEventListener('pointerup', stop);
+    handle.addEventListener('pointercancel', stop);
+  });
+}
+
 window.addEventListener('DOMContentLoaded',()=>{
   initMap();
+  initPanelDragging();
   fbBoot(); // gates app behind auth, hydrates from cloud, then runs the local boot path
 });
 
