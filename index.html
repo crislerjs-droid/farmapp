@@ -1324,6 +1324,13 @@ function togglePlanting(){
   toggleViewMenu();
 }
 function selectSub(subId){
+  // Tap the active sub pill again to clear it.
+  if(activeSubId===subId){
+    activeSubId=null;activeMixIdx=0;
+    hidePanel('pan-event');
+    renderPills();draw();renderUI();
+    return;
+  }
   activeSubId=subId;activeMixIdx=0;
   // Lock the crop filter to the chosen sub's crop so the pill row stays in sync.
   const subs=subcategories[activeCategory]||[];
@@ -1378,6 +1385,14 @@ function renderPills(){
   cont.innerHTML=h;
 }
 function selectCropFilter(crop){
+  // Tap the active crop pill again to clear it.
+  if(activeCropFilter===crop){
+    activeCropFilter=null;
+    activeSubId=null;activeMixIdx=0;
+    hidePanel('pan-event');
+    renderPills();renderEventPanel();draw();renderUI();
+    return;
+  }
   activeCropFilter=crop;
   activeSubId=null;activeMixIdx=0;
   hidePanel('pan-event');
