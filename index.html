@@ -1524,8 +1524,7 @@ function renderEventPanel(){
       +'<span style="font-size:11px;color:'+mx.color+';font-weight:700;">'+mac.toFixed(0)+' ac</span>'
       +'<span style="font-size:9px;color:'+remainingColor+';font-weight:600;">'+remainingLabel+'</span>'
       +'</div>';
-    h+='<button class="tb-btn" onclick="event.stopPropagation();editMixModal('+i+');" style="padding:1px 5px;font-size:9px;flex-shrink:0;" title="Edit mix">✏️</button>';
-    h+='<button class="tb-btn" onclick="event.stopPropagation();removeMix('+i+');" style="padding:1px 5px;font-size:9px;color:#ef4444;border-color:#ef4444;flex-shrink:0;" title="Delete mix">✕</button>';
+    h+='<button class="tb-btn" onclick="event.stopPropagation();editMixModal('+i+');" style="padding:1px 5px;font-size:9px;flex-shrink:0;" title="Edit mix (delete is in the editor)">✏️</button>';
     h+='</div></div>';
     // Products — uniform weight (no bold rate) for consistent look across the mix
     if(mx.products&&mx.products.length){
@@ -1533,11 +1532,11 @@ function renderEventPanel(){
       mx.products.forEach(p=>{h+=esc(p.name)+' '+p.rate+' '+esc(p.unit)+'<br>';});
       h+='</div>';
     }
-    // Select All Fields — text link in place of the old +/- Fields collapsible.
-    // Tap to add this mix's fields to the current map selection (additive).
+    // Select Fields — same plain button style as the footer's Select All /
+    // Remove Selected so it reads as a peer action, not a flashy gold link.
     if(fids.length){
       h+='<div style="padding:3px 0 0 20px;" onclick="event.stopPropagation();">'
-        +'<a onclick="event.stopPropagation();selectMixFields('+i+');" style="cursor:pointer;color:#e8b931;font-size:10px;font-weight:600;text-decoration:underline;" title="Add all of this mix\'s fields to the current map selection">Select All Fields</a>'
+        +'<button class="tb-btn" onclick="event.stopPropagation();selectMixFields('+i+');" style="font-size:9px;" title="Add all of this mix\'s fields to the current map selection">Select Fields</button>'
         +'</div>';
     }
     // Notes — only render the textarea if there's an existing note. Otherwise
@@ -1740,6 +1739,12 @@ function editMixModal(idx){
   h+='</div><input type="hidden" id="m-mix-color" value="'+mx.color+'">';
   h+='<div class="modal-actions"><button class="btn-cancel" onclick="editingMixIdx=null;closeModal()">Cancel</button>';
   h+='<button class="btn-primary" onclick="updateMix()">Save Changes</button></div>';
+  // Delete Mix lives behind the editor (not on the card) so it takes a
+  // deliberate two-click action: open the editor, then confirm delete.
+  h+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid #333;text-align:center;">';
+  h+='<button class="tb-btn" onclick="removeMix('+idx+');closeModal();" style="color:#ef4444;border-color:#ef4444;font-size:11px;padding:5px 12px;">🗑️ Delete this Mix</button>';
+  h+='<div style="font-size:9px;color:#666;margin-top:3px;">Removes the mix and unassigns every field on it.</div>';
+  h+='</div>';
   showModal(h);
   renderProductRows();
 }
