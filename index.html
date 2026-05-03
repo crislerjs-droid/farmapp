@@ -1443,61 +1443,21 @@ function renderEventPanel(){
     h+='<span style="font-size:10px;color:'+mx.color+';font-weight:700;white-space:nowrap;">'+mac.toFixed(0)+'ac·'+fids.length+'fld';
     if(applied>0)h+=' <span style="color:#22c55e;">'+applied+'✓</span>';
     h+='</span>';
-    if(fids.length){
-      h+='<button class="tb-btn" onclick="event.stopPropagation();selectMixFields('+i+');" style="padding:1px 6px;font-size:10px;line-height:1.3;color:#e8b931;border-color:#e8b931;flex-shrink:0;" title="Select all of this mix\'s fields on the map (additive)">⊕</button>';
-    }
     h+='<button class="tb-btn" onclick="event.stopPropagation();editMixModal('+i+');" style="padding:1px 5px;font-size:9px;flex-shrink:0;" title="Edit mix">✏️</button>';
     h+='<button class="tb-btn" onclick="event.stopPropagation();removeMix('+i+');" style="padding:1px 5px;font-size:9px;color:#ef4444;border-color:#ef4444;flex-shrink:0;" title="Delete mix">✕</button>';
     h+='</div></div>';
-    // Products
+    // Products — uniform weight (no bold rate) for consistent look across the mix
     if(mx.products&&mx.products.length){
-      h+='<div style="font-size:10px;color:#aaa;padding-left:20px;line-height:1.35;margin-top:2px;" onclick="event.stopPropagation();">';
-      mx.products.forEach(p=>{h+=esc(p.name)+' <strong style="color:#ccc;">'+p.rate+'</strong> '+esc(p.unit)+'<br>';});
+      h+='<div style="font-size:10px;color:#bbb;padding-left:20px;line-height:1.35;margin-top:2px;" onclick="event.stopPropagation();">';
+      mx.products.forEach(p=>{h+=esc(p.name)+' '+p.rate+' '+esc(p.unit)+'<br>';});
       h+='</div>';
     }
-    // Assigned fields — collapsible chip list with remove (✕) and unmark-applied (↺) controls.
-    // Default collapsed (busy panel otherwise). Expand state is per-session, not synced to teammates.
-    // Sorted: planned first (what's left to do up top), then applied; alphabetical within each group.
+    // Select All Fields — text link in place of the old +/- Fields collapsible.
+    // Tap to add this mix's fields to the current map selection (additive).
     if(fids.length){
-      const expandKey=sub.id+':'+mx.id;
-      const expanded=__mixExpanded.has(expandKey);
-      h+='<div style="padding:4px 0 0 20px;font-size:10px;color:#aaa;" onclick="event.stopPropagation();">';
-      h+='<span style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation();toggleMixFields(\''+expandKey+'\');" title="Show/hide assigned fields">';
-      h+='<span style="display:inline-block;width:12px;text-align:center;color:#888;font-weight:700;font-size:12px;">'+(expanded?'−':'+')+'</span>';
-      h+='<span>Fields ('+fids.length+')</span>';
-      h+='</span>';
-      if(expanded){
-        const sortedFids=fids.slice().sort((a,b)=>{
-          const ea=mx.fields[a],eb=mx.fields[b];
-          const sa=ea.status==='applied'?1:0, sb=eb.status==='applied'?1:0;
-          if(sa!==sb)return sa-sb;
-          const fa=F.find(x=>x.id==a),fb=F.find(x=>x.id==b);
-          return ((fa&&fa.name)||'').localeCompare((fb&&fb.name)||'');
-        });
-        h+='<div style="margin-top:3px;">';
-        sortedFids.forEach(fid=>{
-          const f=F.find(x=>x.id==fid);if(!f)return;
-          const ef=mx.fields[fid];
-          const isApplied=ef.status==='applied';
-          const accent=isApplied?'#22c55e':'#666';
-          h+='<div style="display:flex;align-items:center;gap:6px;background:#262626;padding:3px 6px 3px 8px;border-radius:3px;border-left:3px solid '+accent+';margin:2px 0;font-size:10px;">';
-          h+='<span style="color:#ddd;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(f.name)+'</span>';
-          if(isApplied){
-            let metaTxt=fmtDate(ef.dateApplied);
-            if(ef.applicator) metaTxt+=' · '+ef.applicator;
-            if(ef.vendor) metaTxt+=' · from '+ef.vendor;
-            h+='<span style="color:#888;font-size:9px;flex-shrink:0;">'+esc(metaTxt)+'</span>';
-            h+='<button class="tb-btn" onclick="event.stopPropagation();editApplicationModal('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;flex-shrink:0;" title="Edit date / applicator / vendor">✎</button>';
-            h+='<button class="tb-btn" onclick="event.stopPropagation();unmarkApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;flex-shrink:0;" title="Undo — revert to planned">↺</button>';
-          } else {
-            h+='<button class="tb-btn" onclick="event.stopPropagation();markFieldApplied('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#22c55e;border-color:#22c55e;flex-shrink:0;" title="Mark only this field as applied (uses the date + applicator in the Mark Complete form below)">✓</button>';
-          }
-          h+='<button class="tb-btn" onclick="event.stopPropagation();removeFieldFromMix('+i+','+fid+');" style="padding:0 4px;font-size:10px;line-height:1.4;color:#ef4444;border-color:#ef4444;flex-shrink:0;" title="Remove field from this mix">✕</button>';
-          h+='</div>';
-        });
-        h+='</div>';
-      }
-      h+='</div>';
+      h+='<div style="padding:3px 0 0 20px;" onclick="event.stopPropagation();">'
+        +'<a onclick="event.stopPropagation();selectMixFields('+i+');" style="cursor:pointer;color:#e8b931;font-size:10px;font-weight:600;text-decoration:underline;" title="Add all of this mix\'s fields to the current map selection">Select All Fields</a>'
+        +'</div>';
     }
     // Notes — only render the textarea if there's an existing note. Otherwise
     // show a tiny "+ note" link to expand. Saves a fat empty box per mix.
