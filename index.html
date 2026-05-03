@@ -1238,12 +1238,15 @@ function hardReload(){
   window.location.href = window.location.pathname + '?_=' + Date.now();
 }
 function viewClear(){mode='none';varCrop='';traitCrop='';programCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;activeCropFilter=null;
+  // Drop any field selection — clicking out of a map view should leave a
+  // clean slate, not a stranded selection from the previous spray/fert.
+  sel.clear();editId=null;
   document.getElementById('var-pick').style.display='none';
   document.getElementById('trait-pick').style.display='none';
   document.getElementById('btn-var').textContent='Variety ▾';
   document.getElementById('btn-trait').textContent='Trait ▾';
   clearCatButtons();document.getElementById('btn-clear').classList.add('on');
-  hidePanel('pan-event');renderPills();draw();renderUI();}
+  hidePanel('pan-event');hidePanel('pan-edit');restyle();renderPills();draw();renderUI();}
 function viewCrop(){mode='crop';varCrop='';traitCrop='';programCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;
   document.getElementById('var-pick').style.display='none';
   document.getElementById('trait-pick').style.display='none';
@@ -1326,7 +1329,8 @@ function selectSub(subId){
   // Tap the active sub pill again to clear it.
   if(activeSubId===subId){
     activeSubId=null;activeMixIdx=0;
-    hidePanel('pan-event');
+    sel.clear();editId=null;
+    hidePanel('pan-event');hidePanel('pan-edit');restyle();
     renderPills();draw();renderUI();
     return;
   }
@@ -1388,7 +1392,8 @@ function selectCropFilter(crop){
   if(activeCropFilter===crop){
     activeCropFilter=null;
     activeSubId=null;activeMixIdx=0;
-    hidePanel('pan-event');
+    sel.clear();editId=null;
+    hidePanel('pan-event');hidePanel('pan-edit');restyle();
     renderPills();renderEventPanel();draw();renderUI();
     return;
   }
