@@ -176,7 +176,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
 <!-- Toolbar — three rows, identical layout on all screen sizes -->
 <div class="tb">
   <div class="tb-row">
-    <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50vw;">Loading…</span>
+    <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70vw;">Loading…</span>
     <span style="margin-left:auto;display:flex;align-items:center;gap:6px;">
       <span style="display:flex;align-items:center;gap:4px;">
         <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
@@ -186,7 +186,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
     </span>
   </div>
   <div class="tb-row">
-    <button class="tb-btn" id="btn-planting" onclick="togglePlanting()" title="Crop / variety / trait / program views — tap again to clear">Planting ▾</button>
+    <button class="tb-btn" id="btn-planting" onclick="togglePlantingPanel()" title="Open the planting panel — view modes, variety assignment, plant dates">Planting</button>
     <button class="tb-btn" id="btn-spray" onclick="viewCategory('spray')">Spray</button>
     <button class="tb-btn" id="btn-fertilizer" onclick="viewCategory('fertilizer')">Fertilizer</button>
   </div>
@@ -277,10 +277,36 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div class="map-btn" onclick="goHome()" title="Reset to home view" style="bottom:10px;right:10px;font-size:9px;font-weight:700;letter-spacing:.2px;padding:3px 8px;">🌾 FIELD COMMANDER</div>
 </div>
 
-<!-- Edit panel -->
+<!-- Planting panel — view modes + selected-field editor + batch editor -->
 <div id="pan-edit" class="fpanel" style="width:340px;">
   <button class="fp-close" onclick="hidePanel('pan-edit')">✕</button>
-  <div class="fp-title">Edit Field — <span id="ed-name" style="color:#e8b931;"></span></div>
+  <div class="fp-title">Planting</div>
+
+  <!-- Map View section -->
+  <div style="margin-bottom:8px;">
+    <div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Map View</div>
+    <div class="fp-row">
+      <button class="tb-btn" onclick="viewCrop()" style="flex:1;font-size:11px;">Crop Map</button>
+    </div>
+    <div class="fp-row">
+      <span class="tb-lbl" style="min-width:55px;">Variety:</span>
+      <select class="tb-sel" id="pan-var-pick" style="flex:1;font-size:11px;" onchange="if(this.value){viewVariety(this.value);}"></select>
+    </div>
+    <div class="fp-row">
+      <span class="tb-lbl" style="min-width:55px;">Trait:</span>
+      <select class="tb-sel" id="pan-trait-pick" style="flex:1;font-size:11px;" onchange="if(this.value){viewTrait(this.value);}"></select>
+      <button class="tb-btn" onclick="showPanel('pan-traits');" style="padding:1px 6px;font-size:9px;" title="Edit which trait each variety has">Edit</button>
+    </div>
+    <div class="fp-row">
+      <span class="tb-lbl" style="min-width:55px;">Program:</span>
+      <select class="tb-sel" id="pan-program-pick" style="flex:1;font-size:11px;" onchange="if(this.value){viewProgram(this.value);}"></select>
+      <button class="tb-btn" onclick="showPanel('pan-programs');" style="padding:1px 6px;font-size:9px;" title="Add / edit growing programs and assign fields">Edit</button>
+    </div>
+  </div>
+
+  <!-- Selected-field editor -->
+  <div style="border-top:1px solid #333;padding-top:8px;">
+  <div class="fp-title">Edit Field — <span id="ed-name" style="color:#e8b931;">(tap a field on the map)</span></div>
   <div id="ed-info" style="font-size:10px;color:#888;margin-bottom:8px;"></div>
   <div class="fp-row">
     <select class="tb-sel" id="ed-crop" style="flex:1;" onchange="edSave()"><option>Rice</option><option>Soybeans</option><option>Corn</option><option>Cotton</option><option>Wheat</option><option>Milo</option><option>Crawfish</option><option>Fallow</option></select>
@@ -314,6 +340,7 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
     <div class="fp-row" style="margin-top:6px;">
       <button class="tb-btn" onclick="batApply()" style="background:#22c55e;color:#111;border:none;flex:1;font-weight:700;">✓ Apply to Selected</button>
     </div>
+  </div>
   </div>
 </div>
 
@@ -1315,15 +1342,52 @@ function viewCategory(cat){
   renderPills();draw();renderUI();
 }
 
-// Planting button = the old Map ▾ dropdown (Crop Map / Variety / Trait /
-// Program). Tap to open the picker; tap again while a planting view is
-// active to clear it.
-function togglePlanting(){
-  if(mode==='crop'||mode==='variety'||mode==='trait'||mode==='program'){
-    viewClear();
+// Planting button = open the planting panel (Map View pickers + per-field
+// edit form + batch edit). Tap again to close it (and clear any planting
+// view that's active).
+function togglePlantingPanel(){
+  const pan=document.getElementById('pan-edit');
+  const isShowing = pan && pan.classList.contains('show');
+  if(isShowing){
+    if(mode==='crop'||mode==='variety'||mode==='trait'||mode==='program'){
+      viewClear();
+    }
+    hidePanel('pan-edit');
+    const bp=document.getElementById('btn-planting'); if(bp) bp.classList.remove('on');
     return;
   }
-  toggleViewMenu();
+  // Populate the Map View pickers from current crops/programs/traits.
+  const cropsAll=[...new Set((F||[]).map(f=>f.crop).filter(Boolean))].sort();
+  const vp=document.getElementById('pan-var-pick');
+  if(vp) vp.innerHTML='<option value="">— Pick crop —</option>'+cropsAll.map(c=>'<option value="'+c+'"'+(c===varCrop?' selected':'')+'>'+c+'</option>').join('');
+  const traitable=cropsAll.filter(c=>typeof TRAIT_CROPS!=='undefined' && TRAIT_CROPS.has(c));
+  const tp=document.getElementById('pan-trait-pick');
+  if(tp) tp.innerHTML='<option value="">— Pick crop —</option>'+traitable.map(c=>'<option value="'+c+'"'+(c===traitCrop?' selected':'')+'>'+c+'</option>').join('');
+  const programmable=cropsAll.filter(c=>(programs[c]||[]).length>0);
+  const pp=document.getElementById('pan-program-pick');
+  if(pp){
+    if(!programmable.length) pp.innerHTML='<option value="">— No programs yet — click Edit to add —</option>';
+    else pp.innerHTML='<option value="">— Pick crop —</option>'+programmable.map(c=>'<option value="'+c+'"'+(c===programCrop?' selected':'')+'>'+c+'</option>').join('');
+  }
+  showPanel('pan-edit');
+  const bp=document.getElementById('btn-planting'); if(bp) bp.classList.add('on');
+}
+
+// Legacy alias — togglePlanting still referenced from a couple of older
+// onclicks. Routes to the new combined panel.
+function togglePlanting(){ togglePlantingPanel(); }
+
+// Add every field assigned to ANY mix in the current sub to the map
+// selection. Called from the Select All button in the spray/fert panel
+// footer; lets the user act on the whole sub at once.
+function selectAllSubFields(){
+  const sub=getActiveSub(); if(!sub) return;
+  const ids=new Set();
+  sub.mixes.forEach(mx=>Object.keys(mx.fields||{}).forEach(id=>ids.add(parseInt(id))));
+  if(!ids.size){ alert('No fields assigned to this event yet.'); return; }
+  ids.forEach(id=>{ if(F.find(x=>x.id===id)) sel.add(id); });
+  editId=null;
+  restyle();renderUI();renderEventPanel();
 }
 function selectSub(subId){
   // Tap the active sub pill again to clear it.
@@ -1507,8 +1571,8 @@ function renderEventPanel(){
   h+='<button class="tb-btn" onclick="assignSelected()" style="background:#e8b931;color:#111;border:none;flex:1;">Assign Selected Fields →</button>';
   h+='</div>';
   h+='<div class="fp-row">';
+  h+='<button class="tb-btn" onclick="selectAllSubFields()" style="font-size:9px;">Select All</button>';
   h+='<button class="tb-btn" onclick="clearSpraySelected()" style="font-size:9px;">Remove Selected</button>';
-  h+='<button class="tb-btn" onclick="clearSprayAll()" style="font-size:9px;color:#ef4444;">Clear All</button>';
   h+='</div>';
 
   // Mark Applied section
