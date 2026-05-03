@@ -1076,7 +1076,9 @@ function fitAll(){
   const ff=filtered();if(!ff.length)return;
   let a=Infinity,b=-Infinity,c=Infinity,d=-Infinity;
   ff.forEach(f=>f.points.forEach(p=>{if(p[0]<a)a=p[0];if(p[0]>b)b=p[0];if(p[1]<c)c=p[1];if(p[1]>d)d=p[1];}));
-  map.fitBounds([[a,c],[b,d]],{padding:[40,40]});
+  // Tight 15px padding zooms in as far as possible while keeping every field
+  // on the farm in view. Used as the "default view" after every pill/map flip.
+  map.fitBounds([[a,c],[b,d]],{padding:[15,15]});
 }
 
 // === FIELD STYLING ===
@@ -1273,7 +1275,7 @@ function viewClear(){mode='none';varCrop='';traitCrop='';programCrop='';activeCa
   document.getElementById('btn-var').textContent='Variety ▾';
   document.getElementById('btn-trait').textContent='Trait ▾';
   clearCatButtons();document.getElementById('btn-clear').classList.add('on');
-  hidePanel('pan-event');hidePanel('pan-edit');restyle();renderPills();draw();renderUI();}
+  hidePanel('pan-event');hidePanel('pan-edit');restyle();renderPills();draw();renderUI();fitAll();}
 function viewCrop(){mode='crop';varCrop='';traitCrop='';programCrop='';activeCategory=null;activeSubId=null;activeMixIdx=0;
   document.getElementById('var-pick').style.display='none';
   document.getElementById('trait-pick').style.display='none';
@@ -1281,7 +1283,7 @@ function viewCrop(){mode='crop';varCrop='';traitCrop='';programCrop='';activeCat
   document.getElementById('btn-trait').textContent='Trait ▾';
   clearCatButtons();document.getElementById('btn-crop').classList.add('on');
   const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
-  hidePanel('pan-event');renderPills();draw();renderUI();}
+  hidePanel('pan-event');renderPills();draw();renderUI();fitAll();}
 function viewVarietyPick(){
   document.getElementById('trait-pick').style.display='none';
   const crops=[...new Set(F.map(f=>f.crop))].sort();
@@ -1297,7 +1299,7 @@ function viewVariety(crop){
   clearCatButtons();document.getElementById('btn-var').classList.add('on');
   document.getElementById('btn-var').textContent=crop+' Varieties ▾';
   const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
-  hidePanel('pan-event');renderPills();draw();renderUI();
+  hidePanel('pan-event');renderPills();draw();renderUI();fitAll();
 }
 // Herbicide trait view: colors fields by what chemistry family their variety tolerates
 function viewTraitPick(){
@@ -1317,7 +1319,7 @@ function viewTrait(crop){
   clearCatButtons();document.getElementById('btn-trait').classList.add('on');
   document.getElementById('btn-trait').textContent=crop+' Traits ▾';
   const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
-  hidePanel('pan-event');renderPills();draw();renderUI();
+  hidePanel('pan-event');renderPills();draw();renderUI();fitAll();
 }
 // Program view: colors fields by which growing program they're enrolled in
 // for the selected crop. Programs are user-defined per crop.
@@ -1325,7 +1327,7 @@ function viewProgram(crop){
   if(!crop)return;programCrop=crop;varCrop='';traitCrop='';mode='program';activeCategory=null;activeSubId=null;activeMixIdx=0;
   clearCatButtons();
   const bp=document.getElementById('btn-planting');if(bp)bp.classList.add('on');
-  hidePanel('pan-event');renderPills();draw();renderUI();
+  hidePanel('pan-event');renderPills();draw();renderUI();fitAll();
 }
 function clearCatButtons(){document.querySelectorAll('.tb-btn').forEach(b=>b.classList.remove('on'));}
 
@@ -1339,7 +1341,7 @@ function viewCategory(cat){
   clearCatButtons();
   const btn=document.getElementById('btn-'+cat);if(btn)btn.classList.add('on');
   hidePanel('pan-event');
-  renderPills();draw();renderUI();
+  renderPills();draw();renderUI();fitAll();
 }
 
 // Planting button = open the planting panel (Map View pickers + per-field
@@ -1395,7 +1397,7 @@ function selectSub(subId){
     activeSubId=null;activeMixIdx=0;
     sel.clear();editId=null;
     hidePanel('pan-event');hidePanel('pan-edit');restyle();
-    renderPills();draw();renderUI();
+    renderPills();draw();renderUI();fitAll();
     return;
   }
   activeSubId=subId;activeMixIdx=0;
@@ -1403,7 +1405,7 @@ function selectSub(subId){
   const subs=subcategories[activeCategory]||[];
   const sub=subs.find(s=>s.id===subId);
   if(sub && sub.crop) activeCropFilter=sub.crop;
-  renderPills();draw();renderUI();
+  renderPills();draw();renderUI();fitAll();
   showPanel('pan-event');expandEventPanel();renderEventPanel();
 }
 
@@ -1458,13 +1460,13 @@ function selectCropFilter(crop){
     activeSubId=null;activeMixIdx=0;
     sel.clear();editId=null;
     hidePanel('pan-event');hidePanel('pan-edit');restyle();
-    renderPills();renderEventPanel();draw();renderUI();
+    renderPills();renderEventPanel();draw();renderUI();fitAll();
     return;
   }
   activeCropFilter=crop;
   activeSubId=null;activeMixIdx=0;
   hidePanel('pan-event');
-  renderPills();renderEventPanel();draw();renderUI();
+  renderPills();renderEventPanel();draw();renderUI();fitAll();
 }
 
 // === EVENT PANEL (the right-side panel) ===
