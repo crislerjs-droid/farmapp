@@ -1534,11 +1534,10 @@ function renderEventPanel(){
       mx.products.forEach(p=>{h+=esc(p.name)+' '+p.rate+' '+esc(p.unit)+'<br>';});
       h+='</div>';
     }
-    // Select Fields — same plain button style as the footer's Select All /
-    // Remove Selected so it reads as a peer action, not a flashy gold link.
+    // Select All — small plain button, same family as the footer actions.
     if(fids.length){
       h+='<div style="padding:3px 0 0 20px;" onclick="event.stopPropagation();">'
-        +'<button class="tb-btn" onclick="event.stopPropagation();selectMixFields('+i+');" style="font-size:9px;" title="Add all of this mix\'s fields to the current map selection">Select Fields</button>'
+        +'<button class="tb-btn" onclick="event.stopPropagation();selectMixFields('+i+');" style="font-size:8px;padding:2px 6px;min-height:0;line-height:1.2;" title="Add all of this mix\'s fields to the current map selection">Select All</button>'
         +'</div>';
     }
     // Notes — only render the textarea if there's an existing note. Otherwise
