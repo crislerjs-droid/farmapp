@@ -183,9 +183,6 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div class="tb-row">
     <span id="ctx-pill" onclick="openCtxPicker()" title="Switch farm or crop year" style="display:none;background:#374151;color:#e5e7eb;padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #4b5563;font-family:system-ui;letter-spacing:0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70vw;">Loading…</span>
     <span style="margin-left:auto;display:flex;align-items:center;gap:6px;">
-      <span style="display:flex;align-items:center;gap:4px;">
-        <span class="tb-stat" id="s-acres">0</span><span class="tb-lbl">acres</span>
-      </span>
       <button class="tb-btn" onclick="toggleMenu()" title="Menu" style="padding:4px 9px;font-size:14px;line-height:1;">☰</button>
       <button class="tb-btn" onclick="hardReload()" title="Force a fresh reload from the server (clears cache)" style="padding:4px 8px;min-height:28px;font-size:13px;line-height:1;">↻</button>
     </span>
@@ -279,7 +276,10 @@ textarea.fp-ta{width:100%;padding:6px;background:#222;border:1px solid #444;bord
   <div id="sel-color-pick" class="map-btn" style="display:none;top:10px;left:120px;padding:4px 6px;cursor:pointer;" onclick="cycleSelColor()"><span id="sel-color-swatch" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#EF4444;border:1px solid rgba(255,255,255,.4);vertical-align:middle;"></span> <span style="font-size:10px;vertical-align:middle;">Color</span></div>
   <div id="sel-badge" class="map-btn" style="display:none;bottom:38px;left:10px;font-size:13px;font-weight:700;background:rgba(20,22,28,0.94);color:#e8b931;border-color:#e8b931;padding:6px 14px;letter-spacing:.3px;"></div>
   <div class="map-btn" style="bottom:10px;left:10px;font-size:9px;font-weight:400;color:#888;border-color:#555;cursor:default;pointer-events:none;">Shift + Drag to box select</div>
-  <div class="map-btn" onclick="goHome()" title="Reset to home view" style="bottom:10px;right:10px;font-size:9px;font-weight:700;letter-spacing:.2px;padding:3px 8px;">🌾 FIELD COMMANDER</div>
+  <div class="map-btn" onclick="goHome()" title="Reset to home view" style="bottom:10px;right:10px;padding:4px 9px;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1;">
+    <span style="font-size:9px;font-weight:700;letter-spacing:.2px;">🌾 FIELD COMMANDER</span>
+    <span style="font-size:10px;font-weight:700;color:#fff;"><span id="s-acres">0</span> ac</span>
+  </div>
 </div>
 
 <!-- Planting panel — view modes + selected-field editor + batch editor -->
@@ -1565,9 +1565,11 @@ function renderEventPanel(){
       +'</div>';
     h+='<button class="tb-btn" onclick="event.stopPropagation();editMixModal('+i+');" style="padding:1px 5px;font-size:9px;flex-shrink:0;" title="Edit mix (delete is in the editor)">✏️</button>';
     h+='</div></div>';
-    // Products — uniform weight (no bold rate) for consistent look across the mix
+    // Products — uniform weight (no bold rate) for consistent look across the
+    // mix. NO stopPropagation here so tapping the product list also activates
+    // the mix card (matches user expectation of "click anywhere = active").
     if(mx.products&&mx.products.length){
-      h+='<div style="font-size:10px;color:#bbb;padding-left:20px;line-height:1.35;margin-top:2px;" onclick="event.stopPropagation();">';
+      h+='<div style="font-size:10px;color:#bbb;padding-left:20px;line-height:1.35;margin-top:2px;">';
       mx.products.forEach(p=>{h+=esc(p.name)+' '+p.rate+' '+esc(p.unit)+'<br>';});
       h+='</div>';
     }
