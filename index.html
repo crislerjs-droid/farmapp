@@ -2482,6 +2482,8 @@ function showSprayOrderOverlay(sub,orderFields,vendor){
     sub.mixes.forEach(mx=>{
       // mf = this mix's fields that are part of this cluster's order
       const mf=clusterActive.filter(f=>orderFields.some(o=>o.field.id===f.id && o.mx===mx));
+      // Skip mixes with no fields on this page.
+      if(mf.length===0) return;
       const ac=mf.reduce((s,f)=>s+f.acres,0);
       let blendLb=0,allLb=true;
       (mx.products||[]).forEach(p=>{
@@ -2489,11 +2491,10 @@ function showSprayOrderOverlay(sub,orderFields,vendor){
         if(u==='lb'||u==='lbs'||u==='pound'||u==='pounds') blendLb+=(parseFloat(p.rate)||0)*ac;
         else allLb=false;
       });
-      const showBlend=isFert&&allLb&&blendLb>0;
+      const showBlend=isFert&&allLb&&blendLb>0&&!window._poHideAmounts;
       let blendLabel='';
-      if(mf.length===0) blendLabel=' · <em style="color:#888;font-style:normal;font-weight:500;">not on this map</em>';
-      else if(showBlend) blendLabel=' · <span style="color:#16a34a;font-weight:700;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
-      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;'+(mf.length===0?'opacity:.55;':'')+'">'+
+      if(showBlend) blendLabel=' · <span style="color:#16a34a;font-weight:700;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
+      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
           '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
@@ -2502,8 +2503,12 @@ function showSprayOrderOverlay(sub,orderFields,vendor){
       if(mx.products&&mx.products.length){
         cMix+='<div style="font-size:11.5px;color:#444;padding-left:22px;line-height:1.4;">';
         mx.products.forEach(p=>{
-          // Fertilizer: drop right-column per-product total. Spray: keep it.
-          const rightTotal=isFert?'':'<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>';
+          // Right-column per-product total — hidden for fertilizer AND when
+          // the user has toggled "Amounts" off in the print preview.
+          const showRight = !isFert && !window._poHideAmounts;
+          const rightTotal = showRight
+            ? '<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>'
+            : '';
           cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
             '<span style="flex:1;">'+esc(p.name)+' <strong>'+p.rate+'</strong> '+esc(p.unit)+'</span>'+
             rightTotal+
@@ -2564,6 +2569,7 @@ function showSprayOrderOverlay(sub,orderFields,vendor){
   tbHTML+='<span id="po-page-label" style="color:#aaa;font-size:11px;min-width:160px;text-align:center;display:inline-block;font-variant-numeric:tabular-nums;">'+esc(pages[0].label)+(multi?' (1/'+pages.length+')':'')+'</span>';
   tbHTML+='<button onclick="poNav(1);" '+(navDisabled?'disabled':'')+' style="padding:6px 12px;border-radius:5px;background:'+(navDisabled?'#1f242c':'#333')+';color:'+(navDisabled?'#555':'#ccc')+';border:none;font-size:14px;cursor:'+(navDisabled?'default':'pointer')+';">▶</button>';
   tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;margin-left:6px;"><input type="checkbox" id="po-drone" '+(window._poDrone?'checked':'')+' onchange="poToggleDrone()" style="margin:0;"> 🚁 Drone</label>';
+  tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-amounts" '+(window._poHideAmounts?'':'checked')+' onchange="poToggleAmounts()" style="margin:0;"> Amounts</label>';
   tbHTML+='<button onclick="printOverlayPage();" style="padding:8px 14px;border-radius:5px;background:#e8b931;color:#111;border:none;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🖨️ Print / Save PDF</button>';
   tbHTML+='<span style="margin-left:auto;font-size:9px;color:#666;">or screenshot</span>';
   tbHTML+='</div>';
@@ -4956,6 +4962,9 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
 
     sub.mixes.forEach((mx,idx)=>{
       const mf=activeFields.filter(f=>mx.fields[f.id]);
+      // Skip mixes that aren't on this page — keeps cluster legends focused
+      // on what's actually being mapped here.
+      if(mf.length===0) return;
       const ac=mf.reduce((s,f)=>s+f.acres,0);
       // Sum per-acre lb rates × cluster acres → combined blend poundage.
       let blendLb=0,allLb=true;
@@ -4964,11 +4973,10 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
         if(u==='lb'||u==='lbs'||u==='pound'||u==='pounds') blendLb+=(parseFloat(p.rate)||0)*ac;
         else allLb=false;
       });
-      const showBlend=isFert&&allLb&&blendLb>0;
+      const showBlend=isFert&&allLb&&blendLb>0&&!window._poHideAmounts;
       let blendLabel='';
-      if(mf.length===0) blendLabel=' · <em style="color:#888;font-style:normal;font-weight:500;">not on this map</em>';
-      else if(showBlend) blendLabel=' · <span style="color:#16a34a;font-weight:700;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
-      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;'+(mf.length===0?'opacity:.55;':'')+'">'+
+      if(showBlend) blendLabel=' · <span style="color:#16a34a;font-weight:700;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
+      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
           '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
@@ -4977,9 +4985,13 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
       if(mx.products&&mx.products.length){
         cMix+='<div style="font-size:11.5px;color:#444;padding-left:22px;line-height:1.4;">';
         mx.products.forEach(p=>{
-          // Fertilizer: drop right-column per-product total (blend header
-          // carries the only number that matters). Spray: keep it.
-          const rightTotal=isFert?'':'<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>';
+          // Right-column per-product total — hidden for fertilizer (blend
+          // header is the only number that matters) AND when the user has
+          // toggled "Amounts" off in the print preview.
+          const showRight = !isFert && !window._poHideAmounts;
+          const rightTotal = showRight
+            ? '<span style="font-weight:700;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;">'+pageProductTotal(p.rate,ac,p.unit)+'</span>'
+            : '';
           cMix+='<div style="display:flex;align-items:baseline;gap:10px;padding:1px 0;">'+
             '<span style="flex:1;">'+esc(p.name)+' <strong>'+p.rate+'</strong> '+esc(p.unit)+'</span>'+
             rightTotal+
@@ -5200,6 +5212,7 @@ function showPrintOverlay(){
   if(sub){
     window._lastSprayOverlay = null; // generic flow; clear spray-overlay context
     tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-drone" '+(window._poDrone?'checked':'')+' onchange="poToggleDrone()" style="margin:0;"> 🚁 Drone</label>';
+    tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-amounts" '+(window._poHideAmounts?'':'checked')+' onchange="poToggleAmounts()" style="margin:0;"> Amounts</label>';
   }
   tbHTML+='<button onclick="printOverlayPage();" style="padding:8px 14px;border-radius:5px;background:#e8b931;color:#111;border:none;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🖨️ Print / Save PDF</button>';
   tbHTML+='<span style="margin-left:auto;font-size:9px;color:#666;">or screenshot</span>';
@@ -5310,6 +5323,20 @@ function closePrintOverlay(){
 function poToggleDrone(){
   const cb=document.getElementById('po-drone');
   window._poDrone = !!(cb && cb.checked);
+  poRerenderPreserveIndex();
+}
+
+// Amounts toggle: when off, hide the per-product right-column totals and
+// the blend-poundage line in fertilizer mix headers. Default is on (show).
+function poToggleAmounts(){
+  const cb=document.getElementById('po-amounts');
+  // Checkbox is "Amounts" — checked = show amounts. Internal flag is the
+  // inverse so existing renderers can default to showing.
+  window._poHideAmounts = !(cb && cb.checked);
+  poRerenderPreserveIndex();
+}
+
+function poRerenderPreserveIndex(){
   const idx=window._poPage||0;
   if(window._lastSprayOverlay){
     showSprayOrderOverlay(window._lastSprayOverlay.sub, window._lastSprayOverlay.orderFields, window._lastSprayOverlay.vendor||'');
