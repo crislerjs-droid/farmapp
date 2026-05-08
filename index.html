@@ -63,7 +63,8 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#111;color:#eee;height:
   #print-overlay>div:first-child{display:none!important;}
 }
 /* Floating panels */
-.fpanel{position:fixed;z-index:10000;background:rgba(20,22,28,.97);border:1px solid #444;border-radius:8px;padding:14px;max-width:420px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none;top:50px;right:12px;max-height:calc(100vh - 100px);overflow-y:auto;}
+.fpanel{position:fixed;z-index:10000;background:rgba(20,22,28,.97);border:1px solid #444;border-radius:8px;padding:14px;max-width:420px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none;top:50px;right:12px;max-height:calc(100vh - 100px);overflow-y:auto;overflow-x:hidden;word-wrap:break-word;overflow-wrap:break-word;}
+.fpanel select,.fpanel input,.fpanel textarea{max-width:100%;min-width:0;}
 .fpanel.show{display:block;}
 /* Collapsed: small pill pinned to right edge */
 .fpanel.collapsed{padding:0!important;width:auto!important;max-width:none!important;max-height:none!important;overflow:visible!important;border-radius:6px;top:auto;bottom:80px;right:8px;}
