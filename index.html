@@ -1630,6 +1630,13 @@ function renderEventPanel(){
   h+='<button class="tb-btn" onclick="clearSpraySelected()" style="font-size:9px;">Remove Selected</button>';
   h+='</div>';
 
+  // Map Selected Fields — generate a clean printable map for the applicator,
+  // sits right under Assign so the workflow flows top-to-bottom.
+  h+='<div class="fp-row" style="margin-top:5px;margin-bottom:0;">';
+  h+='<button class="tb-btn" onclick="sendSprayOrder()" style="background:#3B82F6;color:#fff;border:none;flex:1;font-size:12px;font-weight:700;padding:7px;">📄 Map Selected Fields</button>';
+  h+='</div>';
+  h+='<div style="font-size:9px;color:#666;margin-top:2px;">Select fields on map first, then tap to build the print-ready map.</div>';
+
   // Mark Applied section
   h+='<div style="border-top:1px solid #333;margin-top:6px;padding-top:5px;">';
   h+='<div class="fp-title" style="margin-bottom:3px;">Mark Complete</div>';
@@ -1684,14 +1691,6 @@ function renderEventPanel(){
     h+='</div>';
   }
   h+='<div style="font-size:9px;color:#666;margin-top:2px;">Usage (acres × rate) gets deducted from your inventory when you mark applied.</div>';
-  h+='</div>';
-
-  // Send Spray Order
-  h+='<div style="border-top:1px solid #333;margin-top:6px;padding-top:5px;">';
-  h+='<div class="fp-row" style="margin-bottom:0;">';
-  h+='<button class="tb-btn" onclick="sendSprayOrder()" style="background:#3B82F6;color:#fff;border:none;flex:1;font-size:12px;font-weight:700;padding:7px;">📄 Send '+(activeCategory==='fertilizer'?'Fertilizer':'Spray')+' Order</button>';
-  h+='</div>';
-  h+='<div style="font-size:9px;color:#666;margin-top:2px;">Select fields on map first, then tap to create a clean map.</div>';
   h+='</div>';
 
   // Totals
