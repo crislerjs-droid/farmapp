@@ -1567,10 +1567,10 @@ function renderEventPanel(){
     h+='<div style="border:1px solid '+(i===activeMixIdx?mx.color:'#444')+';border-radius:5px;padding:5px 6px;margin-bottom:3px;'
       +(i===activeMixIdx?'background:rgba(255,255,255,.04);':'')+'cursor:pointer;" onclick="activeMixIdx='+i+';renderEventPanel();restyle();renderUI();">';
     h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">';
-    h+='<div style="display:flex;align-items:center;gap:5px;min-width:0;flex:1;">';
-    h+='<span style="width:12px;height:12px;border-radius:3px;background:'+mx.color+';display:inline-block;border:1px solid rgba(255,255,255,.2);flex-shrink:0;"></span>';
-    h+='<input class="tb-input" value="'+esc(mx.name)+'" style="flex:1;min-width:0;font-weight:700;padding:2px 5px;" onchange="getActiveSub().mixes['+i+'].name=this.value;save();renderPills();" onclick="event.stopPropagation();">';
-    h+='</div>';
+    // Just the swatch on the left — mix name moved to Edit Mix to keep cards
+    // tight. Card identity is the swatch color + product list below.
+    h+='<span style="width:14px;height:14px;border-radius:3px;background:'+mx.color+';display:inline-block;border:1px solid rgba(255,255,255,.25);flex-shrink:0;" title="'+esc(mx.name)+'"></span>';
+    h+='<div style="flex:1;"></div>';
     h+='<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">';
     // Stack total acres above the remaining-acres line; drop the field count
     // and applied-count chips since "remaining" already conveys that.
