@@ -2494,7 +2494,7 @@ function showSprayOrderOverlay(sub,orderFields,vendor){
       const showBlend=isFert&&allLb&&blendLb>0&&!window._poHideAmounts;
       let blendLabel='';
       if(showBlend) blendLabel=' · <span style="color:#16a34a;font-weight:700;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
-      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
+      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
           '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
@@ -2570,6 +2570,7 @@ function showSprayOrderOverlay(sub,orderFields,vendor){
   tbHTML+='<button onclick="poNav(1);" '+(navDisabled?'disabled':'')+' style="padding:6px 12px;border-radius:5px;background:'+(navDisabled?'#1f242c':'#333')+';color:'+(navDisabled?'#555':'#ccc')+';border:none;font-size:14px;cursor:'+(navDisabled?'default':'pointer')+';">▶</button>';
   tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;margin-left:6px;"><input type="checkbox" id="po-drone" '+(window._poDrone?'checked':'')+' onchange="poToggleDrone()" style="margin:0;"> 🚁 Drone</label>';
   tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-amounts" '+(window._poHideAmounts?'':'checked')+' onchange="poToggleAmounts()" style="margin:0;"> Amounts</label>';
+  tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-legend" '+(window._poHideLegend?'':'checked')+' onchange="poToggleLegend()" style="margin:0;"> Legend</label>';
   tbHTML+='<button onclick="printOverlayPage();" style="padding:8px 14px;border-radius:5px;background:#e8b931;color:#111;border:none;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🖨️ Print / Save PDF</button>';
   tbHTML+='<span style="margin-left:auto;font-size:9px;color:#666;">or screenshot</span>';
   tbHTML+='</div>';
@@ -2586,8 +2587,10 @@ function showSprayOrderOverlay(sub,orderFields,vendor){
       pagesHTML+='<div style="font-size:9px;color:#666;">'+new Date().toLocaleDateString()+' — '+esc(m.farmNames)+'</div></div>';
       pagesHTML+='<div style="text-align:right;font-size:10px;"><strong>Twin Lakes Farm II</strong><br>'+m.fieldCount+' Fields · '+m.acres.toFixed(0)+' ac</div></div>';
       pagesHTML+=m.svgStr;
-      pagesHTML+='<div style="margin-top:3px;line-height:1.25;">'+m.leg+'</div>';
-      pagesHTML+=m.mixBlock;
+      if(!window._poHideLegend){
+        pagesHTML+='<div style="margin-top:3px;line-height:1.25;">'+m.leg+'</div>';
+        pagesHTML+=m.mixBlock;
+      }
       pagesHTML+='</div>';
     }
     pagesHTML+='</div>';
@@ -4976,7 +4979,7 @@ function renderSVG(activeFields,contextFields,sub,showLabels,allBounds){
       const showBlend=isFert&&allLb&&blendLb>0&&!window._poHideAmounts;
       let blendLabel='';
       if(showBlend) blendLabel=' · <span style="color:#16a34a;font-weight:700;">'+blendLb.toLocaleString(undefined,{maximumFractionDigits:0})+' lb blend</span>';
-      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';background:#fafaf7;">'+
+      cMix+='<div style="margin-top:3px;padding:5px 10px;border-left:4px solid '+mx.color+';">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'+
           '<span style="display:inline-block;width:14px;height:14px;background-color:'+mx.color+';border:1px solid #222;border-radius:2px;flex-shrink:0;"></span>'+
           '<strong style="font-size:14px;color:#111;">'+esc(mx.name)+'</strong>'+
@@ -5213,6 +5216,7 @@ function showPrintOverlay(){
     window._lastSprayOverlay = null; // generic flow; clear spray-overlay context
     tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-drone" '+(window._poDrone?'checked':'')+' onchange="poToggleDrone()" style="margin:0;"> 🚁 Drone</label>';
     tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-amounts" '+(window._poHideAmounts?'':'checked')+' onchange="poToggleAmounts()" style="margin:0;"> Amounts</label>';
+    tbHTML+='<label style="color:#ccc;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="po-legend" '+(window._poHideLegend?'':'checked')+' onchange="poToggleLegend()" style="margin:0;"> Legend</label>';
   }
   tbHTML+='<button onclick="printOverlayPage();" style="padding:8px 14px;border-radius:5px;background:#e8b931;color:#111;border:none;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🖨️ Print / Save PDF</button>';
   tbHTML+='<span style="margin-left:auto;font-size:9px;color:#666;">or screenshot</span>';
@@ -5232,8 +5236,10 @@ function showPrintOverlay(){
       pagesHTML+='<div style="font-size:9px;color:#666;">'+new Date().toLocaleDateString()+' — '+esc(m.farmNames)+'</div></div>';
       pagesHTML+='<div style="text-align:right;font-size:10px;"><strong>Twin Lakes Farm II</strong><br>'+m.fieldCount+' Fields · '+m.acres.toFixed(0)+' ac</div></div>';
       pagesHTML+=m.svgStr;
-      pagesHTML+='<div style="margin-top:3px;line-height:1.25;">'+m.leg+'</div>';
-      pagesHTML+=m.mixBlock;
+      if(!window._poHideLegend){
+        pagesHTML+='<div style="margin-top:3px;line-height:1.25;">'+m.leg+'</div>';
+        pagesHTML+=m.mixBlock;
+      }
       pagesHTML+='</div>';
     }
     pagesHTML+='</div>';
@@ -5333,6 +5339,14 @@ function poToggleAmounts(){
   // Checkbox is "Amounts" — checked = show amounts. Internal flag is the
   // inverse so existing renderers can default to showing.
   window._poHideAmounts = !(cb && cb.checked);
+  poRerenderPreserveIndex();
+}
+
+// Legend toggle: when off, hide the entire mix-card legend block under
+// the map (variety chips + mix cards). Map page becomes just the map.
+function poToggleLegend(){
+  const cb=document.getElementById('po-legend');
+  window._poHideLegend = !(cb && cb.checked);
   poRerenderPreserveIndex();
 }
 
