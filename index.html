@@ -1417,6 +1417,21 @@ function selectSub(subId){
   if(sub && sub.crop) activeCropFilter=sub.crop;
   renderPills();draw();renderUI();fitAll();
   showPanel('pan-event');expandEventPanel();renderEventPanel();
+  positionEventPanel();
+}
+
+// Park pan-event right under the sub-pills bar so the panel opens below
+// the row of pills the user just tapped, not over them. Re-runs after the
+// pills row may have re-rendered to its final height.
+function positionEventPanel(){
+  const pan = document.getElementById('pan-event');
+  const subTb = document.getElementById('sub-pills');
+  if(!pan || !subTb) return;
+  // Defer one tick so the pills row's final height is settled before we measure.
+  setTimeout(()=>{
+    const r = subTb.getBoundingClientRect();
+    pan.style.top = (r.bottom + 4) + 'px';
+  }, 0);
 }
 
 // === PILLS ===
